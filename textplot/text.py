@@ -32,22 +32,28 @@ class Text:
             return cls(f.read())
 
 
-    def __init__(self, text, stopwords=None):
+    def __init__(self, text, lower=False, stopwords=None, min_char=2, lang='en'):
 
         """
         Store the raw text, tokenize.
 
         Args:
             text (str): The raw text string.
-            stopwords (str): A custom stopwords list path.
+            lower: apply lower-casing
+            stopwords (str or list): A custom stopwords path or list
+            min_char (int): exclude words with less characters
         """
 
         self.text = text
+        self.lower = lower
         self.load_stopwords(stopwords)
+        self.min_char = min_char
+
+        self.tokenizer = utils.Tokenizer(lang=lang, lower=lower)
         self.tokenize()
 
 
-    def load_stopwords(self, path):
+    def load_stopwords(self, stopwords):
 
         """
         Load a set of stopwords.
@@ -56,10 +62,12 @@ class Text:
             path (str): The stopwords file path.
         """
 
-        if path:
-            with open(path) as f:
-                self.stopwords = set(f.read().splitlines())
+        if hasattr(stopwords, '__iter__'):
+            self.stopwords = stopwords
 
+        elif os.path.exists(stopwords):
+            with open(stopwords, 'r') as f:
+                self.stopwords = set(f.read().splitlines())
         else:
             self.stopwords = set(
                 pkgutil
@@ -79,10 +87,10 @@ class Text:
         self.terms = OrderedDict()
 
         # Generate tokens.
-        for token in utils.tokenize(self.text):
+        for token in self.tokenizer.tokenize(self.text):
 
             # Ignore stopwords.
-            if token['unstemmed'] in self.stopwords:
+            if token['unstemmed'].lower() in self.stopwords or len(token['unstemmed']) < self.min_char:
                 self.tokens.append(None)
 
             else:
@@ -166,7 +174,12 @@ class Text:
 
         originals = []
         for i in self.terms[term]:
-            originals.append(self.tokens[i]['unstemmed'])
+            try:
+                originals.append(self.tokens[i]['unstemmed'])
+            except (TypeError, IndexError) as e:
+                #print('originals:', self.tokens[i]['unstemmed'])
+                #import pdb; pdb.set_trace()
+                pass
 
         mode = Counter(originals).most_common(1)
         return mode[0][0]
