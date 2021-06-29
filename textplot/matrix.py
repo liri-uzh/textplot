@@ -5,7 +5,7 @@ import textplot.utils as utils
 
 from itertools import combinations
 from clint.textui.progress import bar
-from scipy.misc import comb
+from scipy.special import comb
 from collections import OrderedDict
 
 
