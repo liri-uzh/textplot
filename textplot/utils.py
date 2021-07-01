@@ -29,11 +29,7 @@ class Tokenizer(object):
 
     def tokenize(self, collection):
 
-        prev_length = 0
-
         for text in collection:
-
-            self.global_offset = self.global_offset + prev_length
 
             for tok in self.nlp(text):
 
