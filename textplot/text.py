@@ -28,38 +28,54 @@ class Text:
             path (str): The file path.
         """
 
-        with open(path, 'r', errors='replace') as f:
-            return cls(f.read())
+        # with open(path, 'r', errors='replace') as f:
+        #     return cls(f.read())
+
+        pass
 
 
-    def __init__(self, text, stopwords=None):
+    def __init__(self, token_dicts, stopwords=None, pos=['NOUN', 'PROPN'], min_char=2, lang='en'):
 
         """
         Store the raw text, tokenize.
 
         Args:
             text (str): The raw text string.
-            stopwords (str): A custom stopwords list path.
+            lower: apply lower-casing
+            stopwords (str or list): A custom stopwords path or list
+            min_char (int): exclude words with less characters
         """
 
-        self.text = text
+        self.token_dicts = token_dicts
+        #self.lower = lower
         self.load_stopwords(stopwords)
+        self.min_char = min_char
+
+        if 'pos' in self.token_dicts[0]:
+            self.pos = pos  # filter by given part of speech tags
+        else:
+            self.pos = None
+
+        #self.tokenizer = utils.Tokenizer(lang=lang, lower=lower)
         self.tokenize()
 
 
-    def load_stopwords(self, path):
+    def load_stopwords(self, stopwords):
 
         """
         Load a set of stopwords.
 
         Args:
-            path (str): The stopwords file path.
+            stopwords (str or list): The stopwords file path or list of stopwords.
         """
 
-        if path:
-            with open(path) as f:
-                self.stopwords = set(f.read().splitlines())
+        if hasattr(stopwords, '__iter__'):
+            # check if stopwords is an iterable
+            self.stopwords = stopwords
 
+        elif os.path.exists(stopwords):
+            with open(stopwords, 'r') as f:
+                self.stopwords = set(f.read().splitlines())
         else:
             self.stopwords = set(
                 pkgutil
@@ -79,20 +95,31 @@ class Text:
         self.terms = OrderedDict()
 
         # Generate tokens.
-        for token in utils.tokenize(self.text):
+        for token_dict in self.token_dicts:
 
-            # Ignore stopwords.
-            if token['unstemmed'] in self.stopwords:
+            # filter if in stopword list.
+            if token_dict['original'].lower() in self.stopwords:
                 self.tokens.append(None)
+                continue
+
+            # filter by token length  
+            elif len(token_dict['original']) < self.min_char:
+                self.tokens.append(None)
+                continue
+
+            # filter by part of speech 
+            elif self.pos is not None and token_dict['pos'] not in self.pos:
+                self.tokens.append(None)
+                continue
+
 
             else:
-
                 # Token:
-                self.tokens.append(token)
+                self.tokens.append(token_dict)
 
                 # Term:
-                offsets = self.terms.setdefault(token['stemmed'], [])
-                offsets.append(token['offset'])
+                offsets = self.terms.setdefault(token_dict['normalized'], [])
+                offsets.append(token_dict['offset'])
 
 
     def term_counts(self):
@@ -152,21 +179,22 @@ class Text:
         return top_terms.union(set(bucket))
 
 
-    def unstem(self, term):
+    def unnormalize(self, term):
 
         """
-        Given a stemmed term, get the most common unstemmed variant.
+        Given a normalized term, get the most common unnormalized variant.
 
         Args:
-            term (str): A stemmed term.
+            term (str): A normalized term.
 
         Returns:
-            str: The unstemmed token.
+            str: The most common original token.
         """
 
         originals = []
         for i in self.terms[term]:
-            originals.append(self.tokens[i]['unstemmed'])
+            i_int = int(i)
+            originals.append(self.tokens[i_int]['original'])
 
         mode = Counter(originals).most_common(1)
         return mode[0][0]
@@ -179,7 +207,7 @@ class Text:
         Estimate the kernel density of the instances of term in the text.
 
         Args:
-            term (str): A stemmed term.
+            term (str): A normalized term.
             bandwidth (int): The kernel bandwidth.
             samples (int): The number of evenly-spaced sample points.
             kernel (str): The kernel function.
@@ -267,7 +295,9 @@ class Text:
         Plot kernel density estimates for multiple words.
 
         Args:
-            words (list): A list of unstemmed terms.
+            words (list): A list of unnormalized terms.
+
+        #TODO : change this to work with a custom type of normalization
         """
 
         stem = PorterStemmer().stem

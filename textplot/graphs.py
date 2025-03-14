@@ -87,7 +87,7 @@ class Skimmer(Graph):
 
         for anchor in bar(matrix.keys):
 
-            n1 = text.unstem(anchor)
+            n1 = text.unnormalize(anchor)
 
             # Heaviest pair scores:
             pairs = matrix.anchored_pairs(anchor).items()
@@ -95,9 +95,10 @@ class Skimmer(Graph):
 
                 # If edges represent distance, use the complement of the raw
                 # score, so that similar words are connected by "short" edges.
-                if d_weights: weight = 1-weight
+                if d_weights:
+                    weight = 1 - weight
 
-                n2 = text.unstem(term)
+                n2 = text.unnormalize(term)
 
                 # NetworkX does not handle numpy types when writing graphml,
                 # so we cast the weight to a regular float.
