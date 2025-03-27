@@ -3,3 +3,6 @@
 env
 build
 dist
+.DS_Store
+data
+sandbox/
