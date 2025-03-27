@@ -7,11 +7,11 @@ from textplot.graphs import Skimmer
 from textplot.matrix import Matrix
 
 
-def build_graph(path, term_depth=1000, skim_depth=10,
+def build_graph(corpus, term_depth=1000, skim_depth=10,
                 d_weights=False, **kwargs):
 
     """
-    Tokenize a text, index a term matrix, and build out a graph.
+    Given a corpus-like object (e.g. a file path, directory of files, a list of strings, etc.), index a term matrix, and build out a graph.
 
     Args:
         path (str): The file path.
@@ -23,9 +23,11 @@ def build_graph(path, term_depth=1000, skim_depth=10,
         Skimmer: The indexed graph.
     """
 
+    breakpoint()
     # Tokenize text.
     click.echo('\nTokenizing text...')
-    t = Text.from_file(path)
+    # t = Text.from_file(path)
+    t = Text.load_corpus(corpus)
     click.echo('Extracted %d tokens' % len(t.tokens))
 
     m = Matrix()

@@ -1,11 +1,14 @@
 
 
 import os
+from pathlib import Path
 import re
 import matplotlib.pyplot as plt
 import textplot.utils as utils
 import numpy as np
 import pkgutil
+from typing import Union, List, Optional
+
 
 from nltk.stem import PorterStemmer
 from sklearn.neighbors import KernelDensity
@@ -17,24 +20,149 @@ from functools import lru_cache
 
 class Text:
 
-
     @classmethod
-    def from_file(cls, path):
-
+    def load_corpus(cls, 
+        corpus_like_object: Union[str, Path, List[Union[str, Path]]],
+        recursive: bool = False,
+        combine_separator: str = "\n\n"
+        ):
         """
-        Create a text from a file.
+        Universal method to create a Text instance from various input types.
 
         Args:
-            path (str): The file path.
+            corpus_like_object: The source data in one of these formats:
+                - str: Either a text string or a file/directory path
+                - Path: A file or directory path
+                - List[str/Path]: A list of text strings or file paths
+            recursive (bool): If True and input is a directory, include files in subdirectories.
+            combine_separator (str): Separator used when combining multiple texts.
+
+        Returns:
+            Text: A Text instance with the combined text from all sources.
         """
 
-        # with open(path, 'r', errors='replace') as f:
-        #     return cls(f.read())
+        # Case 1: Path object
+        if isinstance(corpus_like_object, Path):
+            if corpus_like_object.is_file():
+                return cls._from_single_file(corpus_like_object)
+            elif corpus_like_object.is_dir():
+                return cls._from_directory(corpus_like_object, recursive=recursive)
+            else:
+                raise ValueError(f"Path does not exist: {corpus_like_object}")
+        
+        # Case 2: String (either file path or text content)
+        elif isinstance(corpus_like_object, str):
+            # Check if it's a file path
+            path_obj = Path(corpus_like_object)
+            if path_obj.exists():
+                if path_obj.is_file():
+                    return cls._from_single_file(path_obj)
+                elif path_obj.is_dir():
+                    return cls._from_directory(path_obj, recursive=recursive)
+            else:
+                # Treat as text content
+                if not corpus_like_object.strip():
+                    raise ValueError("Input string is empty or contains only whitespace")
+                
+                token_dicts = cls.tokenize_text(corpus_like_object)
+                return cls(token_dicts=token_dicts)
+        
+        # Case 3: List (could be list of strings or file paths)
+        elif isinstance(corpus_like_object, list):
+            if not corpus_like_object:
+                raise ValueError("Empty list provided")
+            
+            # Check if we have file paths or text strings
+            first_item = corpus_like_object[0]
+            if isinstance(first_item, (str, Path)) and Path(first_item).is_file():
+                # List of file paths
+                return cls._from_file_list(corpus_like_object)
+            else:
+                # List of strings
+                valid_texts = [t for t in corpus_like_object if isinstance(t, str) and t.strip()]
+                if not valid_texts:
+                    raise ValueError("No valid text content in the provided list")
+                
+                combined_text = combine_separator.join(valid_texts)
+                token_dicts = cls.tokenize_text(combined_text)
+                return cls(token_dicts=token_dicts)
+        
+        else:
+            raise ValueError(
+                "Invalid input type. Must be a string, Path object, or list of strings/paths."
+            )
 
-        pass
+    # For backward compatibility
+    @classmethod
+    def from_file(cls, path_input, recursive=False):
+        """Alias for load_data for backward compatibility"""
+        return cls.load_data(path_input, recursive=recursive)
+
+    @classmethod
+    def _from_single_file(cls, file_path: Path):
+        """
+        Create a text from a single file.
+        
+        Args:
+            file_path (Path): The file path.
+            
+        Returns:
+            Text: A Text instance with the file's content.
+        """
+        text = file_path.read_text(errors='replace')
+        token_dicts = cls.tokenize_text(text)
+        return cls(token_dicts=token_dicts)
+        
+    @classmethod
+    def _from_directory(cls, dir_path: Path, extension: str = "txt", recursive: bool = False):
+        """
+        Create a text from all text files in a directory.
+        
+        Args:
+            dir_path (Path): The directory path.
+            recursive (bool): Whether to search subdirectories.
+            
+        Returns:
+            Text: A Text instance with the combined content.
+        """
+        text_files = []
+        pattern = f"**/*.{extension}" if recursive else f"*.{extension}"
+        text_files.extend(dir_path.glob(pattern))
+        if not text_files:
+            raise ValueError(f"No files with extension '{extension}' found in the input directory '{dir_path}'")
+            
+        return cls._from_file_list(text_files)
+    
+    @classmethod
+    def _from_file_list(cls, file_paths: List[Union[str, Path]]):
+        """
+        Create a text from a list of file paths.
+        
+        Args:
+            file_paths (List[Union[str, Path]]): List of file paths.
+            
+        Returns:
+            Text: A Text instance with the combined content.
+        """
+        text_content = []
+        
+        for file_path in file_paths:
+            path_obj = file_path if isinstance(file_path, Path) else Path(file_path)
+            
+            if not path_obj.is_file():
+                raise ValueError(f"Not a valid file path: {path_obj}")
+                
+            text_content.append(path_obj.read_text(errors='replace'))
+            
+        if not text_content:
+            raise ValueError("No valid files provided in the list")
+            
+        combined_text = "\n\n".join(text_content)
+        token_dicts = cls.tokenize_text(combined_text)
+        return cls(token_dicts=token_dicts)
 
 
-    def __init__(self, token_dicts, stopwords=None, pos=['NOUN', 'PROPN'], min_char=2, lang='en'):
+    def __init__(self, text=None, token_dicts=None, stopwords=None, pos=['NOUN', 'PROPN'], min_char=2, lang='en'):
 
         """
         Store the raw text, tokenize.
@@ -45,6 +173,8 @@ class Text:
             stopwords (str or list): A custom stopwords path or list
             min_char (int): exclude words with less characters
         """
+        if text is not None:
+            token_dicts = self.tokenize_text(text)
 
         self.token_dicts = token_dicts
         #self.lower = lower
