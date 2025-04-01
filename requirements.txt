@@ -8,3 +8,6 @@ networkx
 clint
 pytest
 click
+pyvis==0.3.2
+spacy==3.8.4
+gensim==4.3.3
