@@ -161,6 +161,18 @@ if __name__ == "__main__":
     
     logging.basicConfig(level=args.loglevel, format='%(asctime)s - %(levelname)s - %(message)s')
 
+    if args.tokenizer != "spacy":
+        if args.lang is not None:
+            logging.warning(f"Language argument is given, but tokenizer is set to {args.tokenizer}. Did you mean to use `--tokenizer spacy`...?")
+        if args.allowed_upos is not None:
+            logging.warning(f"Allowed UPOS argument is given, but tokenizer is set to {args.tokenizer}. Did you mean to use `--tokenizer spacy`...?")
+        if args.phrase_min_count is not None:
+            logging.warning(f"Phrase min count argument is given, but tokenizer is set to {args.tokenizer}. Did you mean to use `--tokenizer spacy`...?")
+        if args.phrase_threshold is not None:
+            logging.warning(f"Phrase threshold argument is given, but tokenizer is set to {args.tokenizer}. Did you mean to use `--tokenizer spacy`...?")
+        if args.phrase_scoring is not None:
+            logging.warning(f"Phrase scoring argument is given, but tokenizer is set to {args.tokenizer}. Did you mean to use `--tokenizer spacy`...?")
+        
     g = build_graph(
         args.corpus, 
         tokenizer=args.tokenizer, 

@@ -16,19 +16,20 @@ In this version, we've added the following features:
 To install the package, clone the repository and install the required dependencies:
 
 ```bash
+# Clone the repository
 git clone git@github.com:liri-uzh/textplot.git
 cd textplot
 
-# Create a virtual environment and activate it
-# If you have `uv` installed, you run
+# Create a virtual environment and install the dependencies
+
+# If you have `uv` (https://github.com/astral-sh/uv) installed, you run
 uv venv --python 3.11 --seed
 source .venv/bin/activate
 uv pip install -r requirements.txt
 
-# Otherwise, you can run use conda or venv
-# Create a virtual environment and activate it
-python3 -m venv .venv
-source .venv/bin/activate
+# Otherwise, you can run use conda or any other virtual environment manager, e.g.
+conda create -n textplot python=3.11
+conda activate textplot
 pip install -r requirements.txt
 
 # Install the language models for SpaCy
@@ -45,8 +46,9 @@ To construct a network from a corpus input (a single text file, a directory of f
 ```bash
 python -m textplot.helpers \
     data/corpora/human_rights.txt \
+    --tokenizer spacy \
     --lang en \
-    --allowed_upos "NOUN" "ADJ" \
+    --allowed_upos NOUN ADJ \
     --stopwords textplot/data/stopwords.txt \
     --phrase_min_count 6 \
     --phrase_threshold 0.6 \

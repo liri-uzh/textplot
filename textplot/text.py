@@ -82,7 +82,7 @@ class Text:
         
         if kwargs.get('tokenizer') in ['spacy', 'phrasal']:
             self.tokenizer = PhrasalTokenizer(
-                lang=kwargs.get('lang', 'en'),
+                lang=kwargs.get('lang', None),
                 min_count=kwargs.get('phrase_min_count', 3),
                 threshold=kwargs.get('phrase_threshold', 0.6),
                 scoring=kwargs.get('phrase_scoring', 'npmi'),
