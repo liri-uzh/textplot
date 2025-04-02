@@ -31,3 +31,7 @@ CONNECTOR_WORDS = {
         'questo', 'questa', 'questi', 'queste', 'quello', 'quella', 'quelli', 'quelle', 'tale', 'tali', 'quale', 'quali', 'chi', 'di cui', 'il cui', 'la cui', 'i cui', 'le cui'
     ])
 }
+
+# format for progress bar in tqdm
+# BAR_FORMAT = '{l_bar}{bar:10}{r_bar}{bar:-10b}'
+BAR_FORMAT = '{desc}{percentage:3.0f}%|{bar:10}{r_bar}'

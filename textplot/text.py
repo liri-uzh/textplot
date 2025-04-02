@@ -19,6 +19,7 @@ from scipy.spatial import distance
 from scipy import ndimage
 from functools import lru_cache
 
+from textplot.constants import BAR_FORMAT
 
 class Text:
 
@@ -35,7 +36,7 @@ class Text:
         texts = []
         glob_pattern = "**/" + file_pattern if recursive else file_pattern
         
-        for file_path in tqdm(list(path.glob(glob_pattern)), desc="Loading files"):
+        for file_path in tqdm(list(path.glob(glob_pattern)), desc="Loading files...", bar_format=BAR_FORMAT):
             try:
                 texts.append(Text._read_file(file_path))
             except Exception as e:
@@ -82,9 +83,9 @@ class Text:
         if kwargs.get('tokenizer') in ['spacy', 'phrasal']:
             self.tokenizer = PhrasalTokenizer(
                 lang=kwargs.get('lang', 'en'),
-                min_count=kwargs.get('min_count', 3),
-                threshold=kwargs.get('threshold', 0.6),
-                scoring=kwargs.get('scoring', 'npmi'),
+                min_count=kwargs.get('phrase_min_count', 3),
+                threshold=kwargs.get('phrase_threshold', 0.6),
+                scoring=kwargs.get('phrase_scoring', 'npmi'),
                 allowed_upos=kwargs.get('allowed_upos', None),
                 stopwords=kwargs.get('stopwords', None),
                 )
@@ -154,8 +155,6 @@ class Text:
             offsets = self.terms.setdefault(token['stemmed'], [])
             offsets.append(token['offset'])
 
-        print(self.tokens[-20:])
-        print(len(self.tokens))
 
     def term_counts(self):
 

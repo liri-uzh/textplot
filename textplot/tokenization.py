@@ -21,10 +21,9 @@ from spacy.tokens import Doc, Token
 from spacy.language import Language
 
 # Import your connector word sets or define them here
-from textplot.constants import CONNECTOR_WORDS
+from textplot.constants import CONNECTOR_WORDS, BAR_FORMAT
 
 # Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 class PhrasalTokenizer:
@@ -99,7 +98,7 @@ class PhrasalTokenizer:
             )
         
         logger.info(f"Initialized PhrasalTokenizer with language: {lang}")
-        logger.info(f"min_count: {min_count}, threshold: {threshold}, scoring: {scoring}")
+        logger.info(f"Hyperparameters for Phrase Detection: min_count: {min_count}, threshold: {threshold}, scoring: {scoring}")
         logger.info(f"Allowed UPOS tags: {allowed_upos}")
         
         # Load stopwords if provided
@@ -148,7 +147,7 @@ class PhrasalTokenizer:
             connector_words=self.connector_words
         )
         
-        for doc in tqdm(docs, total=len(docs), desc="Learning phrases..."):
+        for doc in tqdm(docs, total=len(docs), desc="Learning phrases...", bar_format=BAR_FORMAT):
             doc_sent_tokens = [[token.text for token in sent if not token.is_space] for sent in doc.sents]
             # Apply the bigram model to the sentences
             bigram_model.add_vocab(doc_sent_tokens)
@@ -358,7 +357,7 @@ class PhrasalTokenizer:
         self.phraser_model = self.learn_phrases(docs)
 
         # Apply the phraser model to each document
-        for doc in tqdm(docs, desc="Extracting tokens..."):
+        for doc in tqdm(docs, desc="Extracting tokens...", total=len(docs), bar_format=BAR_FORMAT):
             # Apply the phraser model to the document
             doc = self.apply_phraser(doc, verbose=verbose)
             
@@ -431,7 +430,7 @@ class LegacyTokenizer:
 
         offset = 0
 
-        for match in tqdm(tokens, desc="Extracting tokens..."):
+        for match in tqdm(tokens, desc="Extracting tokens...", bar_format=BAR_FORMAT):
             # Get the raw token
             unstemmed = match.group(0)
             stemmed = self.stemmer.stem(unstemmed)

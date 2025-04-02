@@ -4,10 +4,11 @@ import numpy as np
 import textplot.utils as utils
 
 from itertools import combinations
-from clint.textui.progress import bar
 from scipy.special import comb
 from collections import OrderedDict
 
+from tqdm import tqdm
+from textplot.constants import BAR_FORMAT
 
 class Matrix:
 
@@ -98,7 +99,8 @@ class Matrix:
         pairs = combinations(terms, 2)
         count = comb(len(terms), 2)
 
-        for t1, t2 in bar(pairs, expected_size=count, every=1000):
+        # for t1, t2 in bar(pairs, expected_size=count, every=1000):
+        for t1, t2 in tqdm(pairs, total=count, desc="Indexing terms...", bar_format=BAR_FORMAT):
 
             # Set the Bray-Curtis distance.
             score = text.score_braycurtis(t1, t2, **kwargs)

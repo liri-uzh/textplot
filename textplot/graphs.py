@@ -4,8 +4,9 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 from abc import ABCMeta, abstractmethod
-from clint.textui.progress import bar
 
+from tqdm import tqdm
+from textplot.constants import BAR_FORMAT
 
 class Graph(metaclass=ABCMeta):
 
@@ -85,7 +86,8 @@ class Skimmer(Graph):
             d_weights (bool): If true, give "close" words low edge weights.
         """
 
-        for anchor in bar(matrix.keys):
+        # for anchor in bar(matrix.keys):
+        for anchor in tqdm(matrix.keys, desc="Building graph...", bar_format=BAR_FORMAT):
 
             n1 = text.unstem(anchor)
 
