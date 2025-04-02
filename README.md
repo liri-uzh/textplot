@@ -18,10 +18,17 @@ To install the package, clone the repository and install the required dependenci
 ```bash
 git clone git@github.com:liri-uzh/textplot.git
 cd textplot
+
 # Create a virtual environment and activate it
-pyvenv env
-. env/bin/activate
-# Install the required dependencies
+# If you have `uv` installed, you run
+uv venv --python 3.11 --seed
+source .venv/bin/activate
+uv pip install -r requirements.txt
+
+# Otherwise, you can run use conda or venv
+# Create a virtual environment and activate it
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 
 # Install the language models for SpaCy
@@ -37,14 +44,16 @@ To construct a network from a corpus input (a single text file, a directory of f
 
 ```bash
 python -m textplot.helpers \
-    data/corpora/human_rights_de \
-    --lang de \
+    data/corpora/human_rights.txt \
+    --lang en \
     --allowed_upos "NOUN" "ADJ" \
     --stopwords textplot/data/stopwords.txt \
     --phrase_min_count 6 \
     --phrase_threshold 0.6 \
     --output_file data/human_rights.html
 ```
+
+Make sure to replace `data/corpora/human_rights.txt` with the path to your text file or directory of files. The script will create an HTML file with the network visualization.
 
 For a full list of options, run `python -m textplot.helpers --help`.
 
