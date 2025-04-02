@@ -4,8 +4,13 @@ import os
 import re
 import matplotlib.pyplot as plt
 import textplot.utils as utils
+from textplot.tokenization import LegacyTokenizer, PhrasalTokenizer
 import numpy as np
+from typing import List, Optional
+
 import pkgutil
+from pathlib import Path
+from tqdm import tqdm
 
 from nltk.stem import PorterStemmer
 from sklearn.neighbors import KernelDensity
@@ -14,85 +19,141 @@ from scipy.spatial import distance
 from scipy import ndimage
 from functools import lru_cache
 
+from textplot.constants import BAR_FORMAT
 
 class Text:
 
+    @staticmethod
+    def _read_file(file_path, **kwargs):
+        """Helper method to read a single file."""
+        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+            return f.read()
+    
+    @staticmethod
+    def _read_directory(dir_path, file_pattern="*.txt", recursive=True, **kwargs):
+        """Helper method to read files from a directory."""
+        path = Path(dir_path)
+        texts = []
+        glob_pattern = "**/" + file_pattern if recursive else file_pattern
+        
+        for file_path in tqdm(list(path.glob(glob_pattern)), desc="Loading files...", bar_format=BAR_FORMAT):
+            try:
+                texts.append(Text._read_file(file_path))
+            except Exception as e:
+                print(f"Error reading {file_path}: {e}")
+                
+        return texts
+    
+    @staticmethod
+    def _combine_texts(texts, separator="\n\n", **kwargs):
+        """Helper method to combine multiple texts."""
+        return separator.join(texts)
+    
+    @classmethod
+    def from_file(cls, path, **kwargs):
+        """Create a text from a file."""
+        content = cls._read_file(path)
+        return cls(content, **kwargs)
 
     @classmethod
-    def from_file(cls, path):
+    def from_directory(cls, directory_path, file_pattern="*.txt", recursive=True, **kwargs):
+        """Create a text from multiple files in a directory."""
+        texts = cls._read_directory(directory_path, file_pattern, recursive)
+        return cls.from_texts(texts, **kwargs)
 
+    @classmethod
+    def from_texts(cls, texts, separator="\n\n", **kwargs):
+        """Create a text from a list of text strings."""
+        combined_text = cls._combine_texts(texts, separator)
+        return cls(combined_text, **kwargs)
+
+    def __init__(self, corpus_like_object, **kwargs):
         """
-        Create a text from a file.
-
+        Initialize a Text object from various input sources.
+        
         Args:
-            path (str): The file path.
+            corpus_like_object: Raw text, file path, directory path, file-like object, or list of strings
+            stopwords: Path to stopwords file
+            tokenizer: Name of tokenizer to use
         """
-
-        with open(path, 'r', errors='replace') as f:
-            return cls(f.read())
-
-
-    def __init__(self, text, stopwords=None):
-
-        """
-        Store the raw text, tokenize.
-
-        Args:
-            text (str): The raw text string.
-            stopwords (str): A custom stopwords list path.
-        """
-
-        self.text = text
-        self.load_stopwords(stopwords)
-        self.tokenize()
-
-
-    def load_stopwords(self, path):
-
-        """
-        Load a set of stopwords.
-
-        Args:
-            path (str): The stopwords file path.
-        """
-
-        if path:
-            with open(path) as f:
-                self.stopwords = set(f.read().splitlines())
-
+        self.text = self._process_input(corpus_like_object, **kwargs)
+        self.tokens = None
+        self.terms = None
+        
+        if kwargs.get('tokenizer') in ['spacy', 'phrasal']:
+            self.tokenizer = PhrasalTokenizer(
+                lang=kwargs.get('lang', 'en'),
+                min_count=kwargs.get('phrase_min_count', 3),
+                threshold=kwargs.get('phrase_threshold', 0.6),
+                scoring=kwargs.get('phrase_scoring', 'npmi'),
+                allowed_upos=kwargs.get('allowed_upos', None),
+                stopwords=kwargs.get('stopwords', None),
+                )
         else:
-            self.stopwords = set(
-                pkgutil
-                .get_data('textplot', 'data/stopwords.txt')
-                .decode('utf8')
-                .splitlines()
+            self.tokenizer = LegacyTokenizer(**kwargs)
+
+        self.tokenize(**kwargs)
+    
+    def _process_input(self, corpus_like_object, **kwargs):
+        """
+        Process various input types to extract text content.
+        
+        Args:
+            corpus_like_object: Raw text, file path, directory path, file-like object, or list of strings
+            
+        Returns:
+            str: Extracted text content
+        """
+
+        # String input (raw text or path)
+        if isinstance(corpus_like_object, str):
+            try:
+                path = Path(corpus_like_object)
+                if path.exists():
+                    if path.is_file():
+                        return self.__class__._read_file(path)
+                    elif path.is_dir():
+                        texts = self.__class__._read_directory(path, **kwargs)
+                        return self.__class__._combine_texts(texts)
+                # Not a valid path, treat as raw text
+                return corpus_like_object
+            except (OSError, TypeError):
+                # Not a valid path, treat as raw text
+                return corpus_like_object
+                
+        # List of text strings
+        elif isinstance(corpus_like_object, list) and all(isinstance(i, str) for i in corpus_like_object):
+            return self.__class__._combine_texts(corpus_like_object)
+            
+        # File-like object
+        elif hasattr(corpus_like_object, 'read'):
+            return corpus_like_object.read()
+            
+        else:
+            raise ValueError(
+                "Unsupported input type. Please provide a file path, directory path, "
+                "file object, or text string."
             )
 
-
-    def tokenize(self):
+    def tokenize(self, **kwargs):
 
         """
         Tokenize the text.
         """
-
         self.tokens = []
         self.terms = OrderedDict()
 
         # Generate tokens.
-        for token in utils.tokenize(self.text):
 
-            # Ignore stopwords.
-            if token['unstemmed'] in self.stopwords:
-                self.tokens.append(None)
+        # for token in utils.tokenize(self.text):
+        for token in self.tokenizer.tokenize(self.text, **kwargs):
+            
+            # Gather the tokens.
+            self.tokens.append(token)
 
-            else:
-
-                # Token:
-                self.tokens.append(token)
-
-                # Term:
-                offsets = self.terms.setdefault(token['stemmed'], [])
-                offsets.append(token['offset'])
+            # Gather the terms and their offsets.
+            offsets = self.terms.setdefault(token['stemmed'], [])
+            offsets.append(token['offset'])
 
 
     def term_counts(self):
@@ -172,9 +233,22 @@ class Text:
         return mode[0][0]
 
 
-    @lru_cache(maxsize=None)
-    def kde(self, term, bandwidth=2000, samples=1000, kernel='gaussian'):
+    def kde(self, term, bandwidth=2000, samples=1000, kernel='gaussian', **kwargs):
+        """
+        Wrapper for _kde that handles unhashable kwargs.
+        """
+        # Convert any unhashable kwargs to hashable versions
+        hashable_kwargs = {}
+        for k, v in kwargs.items():
+            if isinstance(v, set):
+                hashable_kwargs[k] = frozenset(v)
+            else:
+                hashable_kwargs[k] = v
+                
+        return self._kde(term, bandwidth, samples, kernel, **hashable_kwargs)
 
+    @lru_cache(maxsize=None)
+    def _kde(self, term, bandwidth=2000, samples=1000, kernel='gaussian', **kwargs):
         """
         Estimate the kernel density of the instances of term in the text.
 
@@ -187,7 +261,6 @@ class Text:
         Returns:
             np.array: The density estimate.
         """
-
         # Get the offsets of the term instances.
         terms = np.array(self.terms[term])[:, np.newaxis]
 

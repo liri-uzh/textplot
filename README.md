@@ -1,113 +1,57 @@
 # Textplot
 
-<sup><a href="http://textplot.s3-website-us-west-1.amazonaws.com/#mental-maps/war-and-peace" target="_new">**_War and Peace_**</a> (click to zoom)</sup>
+This repository contains an extended version of David McClure's `textplot` package, which is a tool for visualizing the structure of a text document. It uses kernel density estimation to create a network of terms based on their co-occurrence in the document.
 
-<a href="http://textplot.s3-website-us-west-1.amazonaws.com/#mental-maps/war-and-peace" target="_new">![War and Peace](notes/mental-maps/networks/war-and-peace.jpg)</a>
+## What's New?
 
-**Textplot** is a little program that converts a document into a network of terms, with the goal of teasing out information about the high-level topic structure of the text. For each term:
+In this version, we've added the following features:
 
-1. Get the set of offsets in the document where the term appears.
+- Text preprocessing with [SpaCy](https://spacy.io/): The text is tokenized and lemmatized using SpaCy, which allows us to benefit from its advanced NLP capabilities and support for multiple languages. Currently, the package supports English, German, French, and Italian, but you can easily add support for other languages by installing the appropriate SpaCy model and updating the code.
+- Phrase detection: The package now includes a phrase detection feature based on [Gensim](https://radimrehurek.com/gensim/models/phrases.html) that allows you to identify and visualize multi-word expressions in the text. This is particularly useful for analyzing texts with complex terminology or idiomatic expressions.
+- Filtering by part-of-speech: The package now allows you to filter the terms included in the network based on their [UPOS](https://universaldependencies.org/u/pos/) tags. This can help you focus on specific types of words, such as nouns or verbs, and improve the quality of your analysis.
+- Support for multiple input formats: The package now supports multiple input formats, including a single plain text file, a directory of files and a pre-loaded list of strings.
 
-1. Using [kernel density estimation](http://en.wikipedia.org/wiki/Kernel_density_estimation), compute a probability density function (PDF) that represents the word's distribution across the document. Eg, from _War and Peace_:
+## Setup
 
-  ![War and Peace](notes/mental-maps/figures/war.png)
-
-1. Compute a [Bray-Curtis](http://en.wikipedia.org/wiki/Bray%E2%80%93Curtis_dissimilarity) dissimilarity between the term's PDF and the PDFs of all other terms in the document. This measures the extent to which two words appear in the same locations.
-
-1. Sort this list in descending order to get a custom "topic" for the term. Skim off the top N words (usually 10-20) to get the strongest links. Here's "napoleon":
-
-  ```bash
-  [('napoleon', 1.0),
-  ('war', 0.65319871313854128),
-  ('military', 0.64782349297012154),
-  ('men', 0.63958189887106576),
-  ('order', 0.63636730075877446),
-  ('general', 0.62621616907584432),
-  ('russia', 0.62233286026418089),
-  ('king', 0.61854160459241103),
-  ('single', 0.61630514751638699),
-  ('killed', 0.61262010905310182),
-  ('peace', 0.60775702746632576),
-  ('contrary', 0.60750138486684579),
-  ('number', 0.59936009740377516),
-  ('accompanied', 0.59748552019874168),
-  ('clear', 0.59661288775164523),
-  ('force', 0.59657370362505935),
-  ('army', 0.59584331507492383),
-  ('authority', 0.59523854206807647),
-  ('troops', 0.59293965397478188),
-  ('russian', 0.59077308177196441)]
-  ```
-
-1. Shovel all of these links into a network and export a GML file.
-
-## Generating graphs
-
-There are two ways to create graphs - you can use the `textplot` executable from the command line, or, if you want to tinker around with the underlying NetworkX graph instance, you can fire up a Python shell and use the `build_graph()` helper directly.
-
-Either way, first install Textplot. With PyPI:
-
-`pip install textplot`
-
-Or, clone the repo and install the package manually:
+To install the package, clone the repository and install the required dependencies:
 
 ```bash
+git clone git@github.com:liri-uzh/textplot.git
+cd textplot
+# Create a virtual environment and activate it
 pyvenv env
 . env/bin/activate
+# Install the required dependencies
 pip install -r requirements.txt
-python setup.py install
+
+# Install the language models for SpaCy
+python -m spacy download en_core_web_sm
+python -m spacy download de_core_news_sm
+python -m spacy download fr_core_news_sm
+python -m spacy download it_core_news_sm
 ```
 
-### From the command line
+## Usage
 
-Then, from the command line, generate graphs with:
-
-`texplot generate [IN_PATH] [OUT_PATH] [OPTIONS]`
-
-Where the input is a regular `.txt` file, and the output is a [`.gml`](http://en.wikipedia.org/wiki/Graph_Modelling_Language) file. So, if you're working with _War and Peace_:
-
-`texplot generate war-and-peace.txt war-and-peace.gml`
-
-The `generate` command takes these options:
-
-- **`--term_depth=1000` (int)** - The number of terms to include in the network. For now, Textplot takes the top N most frequent terms, after stopwords are removed.
-
-- **`--skim_depth=10` (int)** - The number of connections (edges) to skim off the top of the "topics" computed for each word.
-
-- **`--d_weights` (flag)** - By default, terms that appear in similar locations in the document will be connected by edges with "heavy" weights, the semantic expected by force-directed layout algorithms like Force Atlas 2 in Gephi. If this flag is passed, the weights will be inverted - use this if you want to do any kind of pathfinding analysis on the graph, where it's generally assumed that edge weights represent _distance_ or _cost_.
-
-- **`--bandwidth=2000` (int)** - The [bandwidth](http://en.wikipedia.org/wiki/Kernel_density_estimation#Bandwidth_selection) for the kernel density estimation. This controls how "smoothness" of the curve. 2000 is a sensible default for long novels, but bump it down if you're working with shorter texts.
-
-- **`--samples=1000` (int)** - The number of equally-spaced points on the X-axis where the kernel density is sampled. 1000 is almost always enough, unless you're working with a huge document.
-
-- **`--kernel=gaussian` (str)** - The kernel function. The [scikit-learn implementation](http://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KernelDensity.html) also supports `tophat`, `epanechnikov`, `exponential`, `linear`, and `cosine`.
-
-### From a Python shell
-
-Or, fire up a Python shell and import `build_graph()` directly:
+To construct a network from a corpus input (a single text file, a directory of files), use the helpers.py script:
 
 ```bash
-In [1]: from textplot.helpers import build_graph
-
-In [2]: g = build_graph('war-and-peace.txt')
-
-Tokenizing text...
-Extracted 573064 tokens
-
-Indexing terms:
-[################################] 124750/124750 - 00:00:06
-
-Generating graph:
-[################################] 500/500 - 00:00:03
+python -m textplot.helpers \
+    data/corpora/human_rights_de \
+    --lang de \
+    --allowed_upos "NOUN" "ADJ" \
+    --stopwords textplot/data/stopwords.txt \
+    --phrase_min_count 6 \
+    --phrase_threshold 0.6 \
+    --output_file data/human_rights.html
 ```
 
-`build_graph()` returns an instance of `textplot.graphs.Skimmer`, which gives access to an instance of `networkx.Graph`. Eg, to get degree centralities:
+For a full list of options, run `python -m textplot.helpers --help`.
 
-```bash
-In [3]: import networkx as nx
-In [4]: nx.degree_centrality(g.graph)
-```
+## Acknowledgements
 
----
+Textplot is the work of David McClure, who created the original version of the package. 
+
+The extended version was developed by LiRI at UZH and is based largely on David's work. We would like to thank him for making his code available to the community.
 
 Texplot uses **[numpy](http://www.numpy.org)**, **[scipy](http://www.scipy.org)**, **[scikit-learn](http://scikit-learn.org)**, **[matplotlib](http://matplotlib.org)**, **[networkx](http://networkx.github.io)**, and **[clint](https://github.com/kennethreitz/clint)**.
