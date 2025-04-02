@@ -4,6 +4,7 @@ import os
 import re
 import matplotlib.pyplot as plt
 import textplot.utils as utils
+from textplot.tokenization import LegacyTokenizer, PhrasalTokenizer
 import numpy as np
 from typing import List, Optional
 
@@ -22,13 +23,13 @@ from functools import lru_cache
 class Text:
 
     @staticmethod
-    def _read_file(file_path):
+    def _read_file(file_path, **kwargs):
         """Helper method to read a single file."""
         with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
             return f.read()
     
     @staticmethod
-    def _read_directory(dir_path, file_pattern="*.txt", recursive=True):
+    def _read_directory(dir_path, file_pattern="*.txt", recursive=True, **kwargs):
         """Helper method to read files from a directory."""
         path = Path(dir_path)
         texts = []
@@ -43,7 +44,7 @@ class Text:
         return texts
     
     @staticmethod
-    def _combine_texts(texts, separator="\n\n"):
+    def _combine_texts(texts, separator="\n\n", **kwargs):
         """Helper method to combine multiple texts."""
         return separator.join(texts)
     
@@ -74,23 +75,25 @@ class Text:
             stopwords: Path to stopwords file
             tokenizer: Name of tokenizer to use
         """
-        self.text = self._process_input(corpus_like_object)
-        
+        self.text = self._process_input(corpus_like_object, **kwargs)
         self.tokens = None
         self.terms = None
         
-        self.load_stopwords(kwargs.get('stopwords', None))
-
-        if kwargs.get('tokenizer') == 'spacy':
-            self.tokenizer = utils._tokenize_with_spacy
-        elif kwargs.get('tokenizer') == 'gensim':
-            self.tokenizer = utils._tokenize_with_gensim
+        if kwargs.get('tokenizer') in ['spacy', 'phrasal']:
+            self.tokenizer = PhrasalTokenizer(
+                lang=kwargs.get('lang', 'en'),
+                min_count=kwargs.get('min_count', 3),
+                threshold=kwargs.get('threshold', 0.6),
+                scoring=kwargs.get('scoring', 'npmi'),
+                allowed_upos=kwargs.get('allowed_upos', None),
+                stopwords=kwargs.get('stopwords', None),
+                )
         else:
-            self.tokenizer = utils._tokenize_legacy
-        
+            self.tokenizer = LegacyTokenizer(**kwargs)
+
         self.tokenize(**kwargs)
     
-    def _process_input(self, corpus_like_object):
+    def _process_input(self, corpus_like_object, **kwargs):
         """
         Process various input types to extract text content.
         
@@ -100,6 +103,7 @@ class Text:
         Returns:
             str: Extracted text content
         """
+
         # String input (raw text or path)
         if isinstance(corpus_like_object, str):
             try:
@@ -108,7 +112,7 @@ class Text:
                     if path.is_file():
                         return self.__class__._read_file(path)
                     elif path.is_dir():
-                        texts = self.__class__._read_directory(path)
+                        texts = self.__class__._read_directory(path, **kwargs)
                         return self.__class__._combine_texts(texts)
                 # Not a valid path, treat as raw text
                 return corpus_like_object
@@ -130,29 +134,6 @@ class Text:
                 "file object, or text string."
             )
 
-
-    def load_stopwords(self, path):
-
-        """
-        Load a set of stopwords.
-
-        Args:
-            path (str): The stopwords file path.
-        """
-
-        if path:
-            with open(path) as f:
-                self.stopwords = set(f.read().splitlines())
-
-        else:
-            self.stopwords = set(
-                pkgutil
-                .get_data('textplot', 'data/stopwords.txt')
-                .decode('utf8')
-                .splitlines()
-            )
-
-
     def tokenize(self, **kwargs):
 
         """
@@ -162,22 +143,19 @@ class Text:
         self.terms = OrderedDict()
 
         # Generate tokens.
+
         # for token in utils.tokenize(self.text):
-        for token in self.tokenizer(self.text, **kwargs):
+        for token in self.tokenizer.tokenize(self.text, **kwargs):
+            
+            # Gather the tokens.
+            self.tokens.append(token)
 
-            # Ignore stopwords.
-            if token['unstemmed'] in self.stopwords:
-                self.tokens.append(None)
+            # Gather the terms and their offsets.
+            offsets = self.terms.setdefault(token['stemmed'], [])
+            offsets.append(token['offset'])
 
-            else:
-
-                # Token:
-                self.tokens.append(token)
-
-                # Term:
-                offsets = self.terms.setdefault(token['stemmed'], [])
-                offsets.append(token['offset'])
-
+        print(self.tokens[-20:])
+        print(len(self.tokens))
 
     def term_counts(self):
 

@@ -11,7 +11,16 @@ import networkx as nx
 
 from pyvis.network import Network
 
+"""
+Example usage:
 
+    python -m textplot.helpers \
+        data/corpora/human_rights.txt \
+        --tokenizer spacy \
+        --lang en
+        
+
+"""
 
 def build_graph(corpus_like_object, term_depth=1000, skim_depth=10,
                 d_weights=False, **kwargs):
@@ -81,19 +90,14 @@ if __name__ == "__main__":
 
     parser = ArgumentParser(description="Build a graph from a text corpus.")
     parser.add_argument("corpus", help="Path to file/directory/string containing the text corpus.")
+    parser.add_argument("--file_pattern", default="*.txt", type=str, help="File pattern for directory input.")
     parser.add_argument("--tokenizer", default=None, type=str, choices=["spacy", "gensim", "legacy", None], help="Tokenizer to use.")
-    parser.add_argument("--lang", default="en", type=str, help="Language for the tokenizer.")
-    parser.add_argument("--use_mwe", action="store_true", help="Use multi-word expressions.")
-    parser.add_argument("--filter_stopwords", action="store_true", help="Filter out stopwords.")
+    parser.add_argument("--lang", default=None, type=str, help="Language for the tokenizer.")
     parser.add_argument("--stopwords", default=None, type=str, help="Path to stopwords file.")
-    parser.add_argument("--exclude_upos", nargs="*", 
-        default=[
-            # "ADJ", "ADV", "INTJ", "NOUN", "PROPN", "VERB" # Open class words
-            "ADP", "AUX", "CCONJ", "DET", "NUM", "PART", "PRON", "SCONJ", # Closed class words
-            "PUNCT", "SYM", "X", # Other
-            ], 
-            help="List of UPOS tags to exclude. See list here: https://universaldependencies.org/u/pos/"
-            )
+    parser.add_argument("--allowed_upos", nargs="*", 
+        default=["ADJ", "ADV", "INTJ", "NOUN", "PROPN", "VERB"], # open-class words
+        help="List of UPOS tags to exclude. See list here: https://universaldependencies.org/u/pos/"
+        )
     parser.add_argument("--noun_chunks", action="store_true", help="Use noun chunks.")
     parser.add_argument("--chunk_size", default=1000, type=int, help="Chunk size for processing.")
     parser.add_argument("--output_file", default=None, type=str, help="Output file name.")
@@ -104,12 +108,11 @@ if __name__ == "__main__":
         args.corpus, 
         tokenizer=args.tokenizer, 
         lang=args.lang, 
-        use_mwe=args.use_mwe,
-        filter_stopwords=args.filter_stopwords,
         stopwords=args.stopwords,
-        exclude_upos=set(args.exclude_upos),
+        allowed_upos=set(args.allowed_upos),
         noun_chunks=args.noun_chunks,
         chunk_size=args.chunk_size,
+        file_pattern=args.file_pattern,
         )
 
 
