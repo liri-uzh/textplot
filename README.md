@@ -41,23 +41,41 @@ python -m spacy download it_core_news_sm
 
 ## Usage
 
-To construct a network from a corpus input (a single text file, a directory of files), use the helpers.py script:
+To construct a network from a corpus input (a single text file, a directory of files), use the `helpers.py` script:
 
 ```bash
 python -m textplot.helpers \
     data/corpora/human_rights.txt \
     --tokenizer spacy \
     --lang en \
-    --allowed_upos NOUN ADJ \
+    --allowed_upos NOUN \
     --stopwords textplot/data/stopwords.txt \
-    --phrase_min_count 6 \
-    --phrase_threshold 0.6 \
-    --output_file data/human_rights.html
+    --phrase_min_count 6 --phrase_threshold 0.6 \
+    --bandwidth 2000 --term_depth 200 --skim_depth 5 -d \
+    --output_dir data/outputs
 ```
 
-Make sure to replace `data/corpora/human_rights.txt` with the path to your text file or directory of files. The script will create an HTML file with the network visualization.
+By default, this will create 3 output files in the output directory:
+- `<network>.gml`: The network in GML format, which can be opened with [Gephi](https://gephi.org/).
+- `<network>.html`: An interactive HTML file with the network visualization built with `pyvis`.
+- `<network>.graphml`: The network in GraphML format (XML).
+
+Note, make sure to replace `data/corpora/human_rights.txt` with the path to your text file or directory of files. 
+
+An example of the resulting network with `pyvis` is shown below:
+
+![Example network for human rights text](./examples/human_rights-td200-sd5-bw2000-dwFalse.png)
 
 For a full list of options, run `python -m textplot.helpers --help`.
+
+## TODOs
+
+- [ ] pre vs. post filtering for POS, key terms, sudo words etc.
+- [ ] add support for sudo words (these are words that need to be kept for the analysis, but are ultimately visualised in the network)
+- [ ] re-scoring and filtering with TF-IDF (needs document boundaries or reference corpus)
+- [x] intermediate output of .gml files for networkx
+- [x] remove numbers from outputs
+- [ ] improve visualisations with [forceatlas](https://github.com/bhargavchippada/forceatlas2) or post-hoc processing with [gephi](https://gephi.org/)
 
 ## Acknowledgements
 

@@ -86,7 +86,7 @@ class Skimmer(Graph):
             d_weights (bool): If true, give "close" words low edge weights.
         """
 
-        # for anchor in bar(matrix.keys):
+        # breakpoint()
         for anchor in tqdm(matrix.keys, desc="Building graph...", bar_format=BAR_FORMAT):
 
             n1 = text.unstem(anchor)

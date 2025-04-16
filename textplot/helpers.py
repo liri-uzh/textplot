@@ -52,6 +52,7 @@ def set_args():
     parser.add_argument("--term_depth", default=1000, type=int, help="Consider the N most frequent terms.")
     parser.add_argument("--skim_depth", default=10, type=int, help="Connect each word to the N closest siblings.")
     parser.add_argument("--d_weights", action="store_true", help="If true, give 'close' nodes low weights.")
+    parser.add_argument("--bandwidth", default=2000, type=int, help="Bandwidth for the graph. This is the number of nodes to consider when calculating the distance between nodes.")
 
     # plotting options
     parser.add_argument("--height", default=1500, type=int, help="Height of the graph in px.")
@@ -60,9 +61,8 @@ def set_args():
     parser.add_argument("--notebook", action="store_true", help="If true, plot in a notebook.")
     parser.add_argument("--node_size", default=20, type=int, help="Node size.")
     parser.add_argument("--font_size", default=80, type=int, help="Font size.")
-    parser.add_argument("--output_file", default=None, type=str, help="Output file name for the html graph.")
-
-
+    parser.add_argument("--output_dir", default=None, type=str, help="Output directory to save all files. File names will be inferred from the input file name and args provided")
+    
     return parser.parse_args()
 
 def build_graph(
@@ -155,6 +155,31 @@ def plot_graph(
     return
 
 
+def infer_output_filename_from_args(args):
+    """
+    Infer the output filename from the arguments.
+    Args:
+        args (Namespace): The arguments.
+    Returns:
+        str: The output filename.
+    """
+    if args.output_dir is None:
+        output_dir = Path(args.corpus).parent
+    else:
+        output_dir = Path(args.output_dir)
+
+    # make the output directory if it doesn't exist
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    output_file_stem = Path(args.corpus).stem
+    output_file_stem += f"-td{args.term_depth}"
+    output_file_stem += f"-sd{args.skim_depth}"
+    output_file_stem += f"-bw{args.bandwidth}"
+    output_file_stem += f"-dw{args.d_weights}"
+
+    return output_dir / output_file_stem
+
+
 if __name__ == "__main__":
 
     args = set_args()
@@ -186,6 +211,16 @@ if __name__ == "__main__":
         phrase_scoring=args.phrase_scoring,
         )
 
+    logging.info(f"Graph built with {len(g.graph.nodes)} nodes and {len(g.graph.edges)} edges")
+
+    # Infer the output filename from the arguments
+    output_file_path = infer_output_filename_from_args(args)
+
+    # Write the graph to a GML file
+    g.write_gml(output_file_path.with_suffix(".gml")) # GML format
+    g.write_graphml(output_file_path.with_suffix(".graphml")) # XML format
+    logging.info(f"Graphs written to {output_file_path}.gml and {output_file_path}.graphml")
+
     # Save the graph to a file
     # print(nx.degree_centrality(g.graph))
     plot_graph(
@@ -196,5 +231,7 @@ if __name__ == "__main__":
         notebook=args.notebook,
         node_size=args.node_size,
         font_size=args.font_size,
-        output_file=args.output_file,
+        output_file=output_file_path.with_suffix(".html"),
         )
+
+    logging.info(f"Graph plotted to {output_file_path}.html")

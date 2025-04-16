@@ -45,6 +45,7 @@ class PhrasalTokenizer:
         connector_words: Optional[Set[str]] = None,
         disable: Optional[List[str]] = None,
         phrase_lemma: Optional[str] = "full", # NOTE: "full" seems to work best
+        prefilter: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -66,6 +67,7 @@ class PhrasalTokenizer:
         self.allowed_upos = allowed_upos or set()
         self.phraser_model = None
         self.phrase_lemma = phrase_lemma
+        self.prefilter = prefilter
                 
         # Set default disabled components if none provided
         if disable is None:
@@ -285,16 +287,16 @@ class PhrasalTokenizer:
             # If token is outside any phrase
             if token._.phrase_iob == "O":
                 # Skip token if it is a stopword
-                if token.is_stop or token.is_punct or token.is_space:
+                if token.is_stop or token.is_punct or token.is_space or token.is_digit:
                     i += 1
                     continue
 
                 # Skip token if it is an excluded UPOS tag
-                if self.allowed_upos and token.pos_ not in self.allowed_upos:
+                if self.prefilter and self.allowed_upos and token.pos_ not in self.allowed_upos:
                     i += 1
                     continue
 
-                yield {"unstemmed": token.text, "stemmed": token.lemma_}
+                yield {"unstemmed": token.text, "stemmed": token.lemma_, "pos": token.pos_}
                 i += 1
                 
             # If token is the beginning of a phrase
@@ -311,13 +313,15 @@ class PhrasalTokenizer:
                 
                 if self.phrase_lemma == "full":
                     phrase_lemma = phrase_text.lower()
+                    phrase_pos = phrase_tokens[0].pos_
                 elif self.phrase_lemma == "last":
                     # Get the lemma of the last token in the phrase
                     phrase_lemma = phrase_tokens[-1].lemma_
+                    phrase_pos = phrase_tokens[-1].pos_
                 else:
                     raise ValueError("Invalid value for phrase_lemma. Use 'full' or 'last'.")
                 
-                yield {"unstemmed": phrase_text, "stemmed": phrase_lemma}
+                yield {"unstemmed": phrase_text, "stemmed": phrase_lemma, "pos": phrase_pos}
                 
                 # Move to the token after the phrase
                 i = j
@@ -325,7 +329,7 @@ class PhrasalTokenizer:
             # If we encounter an "I" without a preceding "B", treat it as an "O"
             # (this handles potential errors in IOB tagging)
             else:  # token._.phrase_iob == "I"
-                yield {"unstemmed": token.text, "stemmed": token.lemma_}
+                yield {"unstemmed": token.text, "stemmed": token.lemma_, "pos": token.pos_}
                 i += 1
     
     def tokenize(
