@@ -73,8 +73,8 @@ For a full list of options, run `python -m textplot.helpers --help`.
 - [ ] pre vs. post filtering for POS, key terms, sudo words etc.
 - [ ] add support for sudo words (these are words that need to be kept for the analysis, but are ultimately visualised in the network)
 - [ ] re-scoring and filtering with TF-IDF (needs document boundaries or reference corpus)
-- [x] intermediate output of .gml files for networkx
-- [x] remove numbers from outputs
+- [x] ~~intermediate output of .gml files for networkx~~
+- [x] ~~remove numbers from outputs~~
 - [ ] improve visualisations with [forceatlas](https://github.com/bhargavchippada/forceatlas2) or post-hoc processing with [gephi](https://gephi.org/)
 
 ## Acknowledgements
