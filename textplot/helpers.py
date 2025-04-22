@@ -10,6 +10,8 @@ import click
 from textplot.text import Text
 from textplot.graphs import Skimmer
 from textplot.matrix import Matrix
+from textplot.plotting import plot_graph
+
 import networkx as nx
 
 from pyvis.network import Network
@@ -102,58 +104,6 @@ def build_graph(
     return g
 
 
-def plot_graph(
-    g: Skimmer,
-    height: int = 1500,
-    width: int = 100, 
-    directed: bool = False, 
-    notebook: bool = False,
-    node_size: int = 20, 
-    font_size: int = 80, 
-    output_file: Optional[str] = None
-    ) -> None:
-
-    """
-    Plot a graph using pyvis.
-    Args:
-        g (Skimmer): The graph to plot.
-        height (int): Height of the graph in px.
-        width (int): Width of the graph as a percentage.
-        directed (bool): If true, plot a directed graph.
-        notebook (bool): If true, plot in a notebook.
-        node_size (int): Node size.
-        font_size (int): Font size.
-        output_file (str): Output file name for the html graph.
-    Returns:
-        None
-    """
-
-    # Create a pyvis network object
-    nt = Network(
-        height=f"{height}px",
-        width=f"{width}%",
-        directed=directed,
-        notebook=notebook,
-        # cdn_resources="remote",
-        )
-
-    nt.from_nx(g.graph)
-
-    for n in nt.nodes:
-        n["size"] = node_size
-        n["font"] = {"size": font_size}
-
-    nt.force_atlas_2based()  # this method showed the best visualisation result
-    nt.toggle_physics(True)
-
-    if output_file:
-        Path(output_file).parent.mkdir(parents=True, exist_ok=True)
-        # generate the visualization and save it as an HTML file
-        nt.show(str(output_file), notebook=notebook)
-    else:
-        print("No output file specified. Graph not saved.")
-    return
-
 
 def infer_output_filename_from_args(args):
     """
@@ -197,7 +147,8 @@ if __name__ == "__main__":
             logging.warning(f"Phrase threshold argument is given, but tokenizer is set to {args.tokenizer}. Did you mean to use `--tokenizer spacy`...?")
         if args.phrase_scoring is not None:
             logging.warning(f"Phrase scoring argument is given, but tokenizer is set to {args.tokenizer}. Did you mean to use `--tokenizer spacy`...?")
-        
+
+    # returns a Skimmer object  
     g = build_graph(
         args.corpus, 
         tokenizer=args.tokenizer, 
@@ -221,17 +172,12 @@ if __name__ == "__main__":
     g.write_graphml(output_file_path.with_suffix(".graphml")) # XML format
     logging.info(f"Graphs written to {output_file_path}.gml and {output_file_path}.graphml")
 
-    # Save the graph to a file
-    # print(nx.degree_centrality(g.graph))
-    plot_graph(
-        g, 
-        height=args.height,
-        width=args.width,
-        directed=args.directed,
-        notebook=args.notebook,
-        node_size=args.node_size,
-        font_size=args.font_size,
-        output_file=output_file_path.with_suffix(".html"),
-        )
-
-    logging.info(f"Graph plotted to {output_file_path}.html")
+    # g.draw_spring(
+    #     # node_size=args.node_size,
+    #     save_as=output_file_path.with_suffix(".png"),
+    #     # with_labels=True,
+    #     # font_size=args.font_size,
+    #     # alpha=0.5,
+    #     # edge_color="#dddddd",
+    #     # **args.__dict__
+    # )

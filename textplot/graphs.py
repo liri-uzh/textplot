@@ -25,7 +25,7 @@ class Graph(metaclass=ABCMeta):
         pass
 
 
-    def draw_spring(self, **kwargs):
+    def draw_spring(self, save_as: str = None, **kwargs):
 
         """
         Render a spring layout.
@@ -40,7 +40,11 @@ class Graph(metaclass=ABCMeta):
             **kwargs
         )
 
-        plt.show()
+        if save_as:
+            plt.savefig(save_as, format='png', dpi=300, bbox_inches='tight')
+            print(f"Graph saved as {save_as}")
+        else:
+            plt.show()
 
 
     def write_gml(self, path):

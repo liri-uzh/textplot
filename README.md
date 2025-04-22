@@ -41,7 +41,9 @@ python -m spacy download it_core_news_sm
 
 ## Usage
 
-To construct a network from a corpus input (a single text file, a directory of files), use the `helpers.py` script:
+To construct a network from a corpus input (a single text file, a directory of files), we follow a two-step process:
+
+1. Use the `helpers.py` script to process the text and compute the network:
 
 ```bash
 python -m textplot.helpers \
@@ -55,10 +57,21 @@ python -m textplot.helpers \
     --output_dir data/outputs
 ```
 
+This first command processes the text file `data/corpora/human_rights.txt` using SpaCy for tokenization and lemmatization, filters the terms based on their UPOS tags (in this case, only nouns), and applies phrase detection with Gensim. 
 By default, this will create 3 output files in the output directory:
 - `<network>.gml`: The network in GML format, which can be opened with [Gephi](https://gephi.org/).
-- `<network>.html`: An interactive HTML file with the network visualization built with `pyvis`.
 - `<network>.graphml`: The network in GraphML format (XML).
+
+
+2. Use the `plotting.py` script to visualize the network:
+
+```bash
+python -m textplot.plotting data/outputs/human_rights-td200-sd5-bw2000-dwFalse.gml --iterations 45 --layout_algorithm "fa2"
+```
+
+The second command takes the gml file generated in the first step and visualizes the network using the `plotting.py` script. 
+The `--iterations` parameter controls the number of iterations for the force-directed layout algorithm, and the `--layout_algorithm` parameter specifies which layout algorithm to use. In this case, we are using the ForceAtlas2 algorithm. Run `python -m textplot.plotting --help` for more options.
+
 
 Note, make sure to replace `data/corpora/human_rights.txt` with the path to your text file or directory of files. 
 
@@ -70,7 +83,7 @@ For a full list of options, run `python -m textplot.helpers --help`.
 
 ## TODOs
 
-- [ ] pre vs. post filtering for POS, key terms, sudo words etc.
+- [ ] ~~pre vs. post filtering for POS, key terms, sudo words etc.~~
 - [ ] add support for sudo words (these are words that need to be kept for the analysis, but are ultimately visualised in the network)
 - [ ] re-scoring and filtering with TF-IDF (needs document boundaries or reference corpus)
 - [x] ~~intermediate output of .gml files for networkx~~
