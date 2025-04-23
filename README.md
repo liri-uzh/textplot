@@ -66,11 +66,14 @@ By default, this will create 3 output files in the output directory:
 2. Use the `plotting.py` script to visualize the network:
 
 ```bash
-python -m textplot.plotting data/outputs/human_rights-td200-sd5-bw2000-dwFalse.gml --iterations 45 --layout_algorithm "fa2"
+python -m textplot.plotting data/outputs/human_rights-td200-sd5-bw2000-dwFalse.gml
 ```
 
-The second command takes the gml file generated in the first step and visualizes the network using the `plotting.py` script. 
-The `--iterations` parameter controls the number of iterations for the force-directed layout algorithm, and the `--layout_algorithm` parameter specifies which layout algorithm to use. In this case, we are using the ForceAtlas2 algorithm. Run `python -m textplot.plotting --help` for more options.
+The second command takes the gml file generated in the first step and visualizes the network using the `plotting.py` script.
+By default, the script runs a series of layout hyperparameters and saves the output png and json files in the same directory as the input file. 
+This allows for quick exploration of potential layouts and visualizations for a given network.
+If you do not want to explore the layout hyperparameters, you can specify `--no_trials`, in which case, the script will only generate a single plot with the layout parameters specified in the command line.
+In this case, the `--iterations` parameter controls the number of iterations for the force-directed layout algorithm, and the `--layout_algorithm` parameter specifies which layout algorithm to use. In this case, we are using the ForceAtlas2 algorithm. Run `python -m textplot.plotting --help` for more options.
 
 
 Note, make sure to replace `data/corpora/human_rights.txt` with the path to your text file or directory of files. 

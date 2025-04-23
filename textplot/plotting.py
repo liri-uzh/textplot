@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import json
 import logging
+import itertools
 from pathlib import Path
 from argparse import ArgumentParser
 from typing import Dict, Optional, List
 
+from tqdm import tqdm
 import seaborn as sns
 from matplotlib import pyplot as plt
 
@@ -212,7 +215,6 @@ def plot_graph(
 #         print("No output file specified. Graph not saved.")
 #     return
 
-
 def tuple_type(strings):
     strings = strings.replace("(", "").replace(")", "")
     mapped_int = map(int, strings.split(","))
@@ -258,47 +260,95 @@ def set_args():
     parser.add_argument('-d', '--debug', action="store_const", dest="loglevel", const=logging.DEBUG, default=logging.WARNING, help="Print DEBUG level messages")
     parser.add_argument('-v', '--verbose', help="Print INFO level messages", action="store_const", dest="loglevel", const=logging.INFO)
 
+    parser.add_argument(
+        '--no_trials',
+        action="store_true", 
+        help="Do not run trials, use the provided parameters only." \
+        " Otherwise, we run a set of trials for different combinations of default parameters." \
+        " This is useful for exploring the best parameters for plotting."
+    )
+    
+
     args = parser.parse_args()
     
     return args
 
-if __name__ == "__main__":
-
+def main():
+    """
+    Main function to run the script.
+    """
     args = set_args()
-
+    
     logging.basicConfig(level=args.loglevel, format='%(asctime)s - %(levelname)s - %(message)s')
-
+    
     input_file = Path(args.input_file)
-    output_file = Path(args.output_file) if args.output_file else input_file.with_suffix(".png")
-    # create the output directory if it doesn't exist
-    output_file.parent.mkdir(parents=True, exist_ok=True)
 
     g = nx.read_gml(input_file)
 
-    subgraph_nodes = args.subgraph_nodes if args.subgraph_nodes else None
+    if args.no_trials:
+        search_grid = {
+            "layout_algorithm": [args.layout_algorithm],
+            "max_iter": [args.max_iter],
+            "seed": [args.seed],
+        }
+    else:
+        search_grid = {
+            "layout_algorithm": ["forceatlas2_layout"],
+            "max_iter": [50, 100, 200, 300, 400, 500],
+            "seed": [42, 123, 456, 789, 101112],
+        }
+    
+    # get the set of all possible combinations of the parameters
+    keys, values = zip(*search_grid.items())
+    permutations_dicts = [dict(zip(keys, v)) for v in itertools.product(*values)]
+    
+    # breakpoint()
+    for i, params in tqdm(enumerate(permutations_dicts), total=len(permutations_dicts)):
+        logging.info(f"Trial {i+1}/{len(permutations_dicts)}: {params}")
+        
+        perm_id = f"{i+1:003}"
+        output_file = input_file.parent / f'{input_file.stem}-{perm_id}.png'
+        settings_file = input_file.parent / f'{input_file.stem}-{perm_id}.json'
 
-    plotting_kwargs = {
-        "palette": args.palette,
-        "label_subgraph_nodes": args.label_subgraph_nodes,
-        "font_size": args.font_size,
-        "node_size": args.node_size,
-        "negative_alpha": args.negative_alpha,
-        "figsize": args.figsize,
-        "main_graph_color": args.main_graph_color,
-    }
+        layout_kwargs = {
+            "algorithm": params["layout_algorithm"],
+            "max_iter": params["max_iter"],
+            "seed": params["seed"],
+        }
 
-    layout_kwargs = {
-        "algorithm": args.layout_algorithm,
-        "max_iter": args.max_iter,
-        "seed": args.seed,
-    }
+        plotting_kwargs = {
+            "palette": args.palette,
+            "label_subgraph_nodes": args.label_subgraph_nodes,
+            "font_size": args.font_size,
+            "node_size": args.node_size,
+            "negative_alpha": args.negative_alpha,
+            "figsize": args.figsize,
+            "main_graph_color": args.main_graph_color,
+        }
 
-    plot_graph(
-        g,
-        subgraph_nodes,
-        layout_kwargs=layout_kwargs,
-        plotting_kwargs=plotting_kwargs,
-        label_subgraph_nodes=True,
-        verbose=True,
-        save_as=output_file,
-    )
+        plot_graph(
+            g,
+            subgraph_nodes=args.subgraph_nodes,
+            layout_kwargs=layout_kwargs,
+            plotting_kwargs=plotting_kwargs,
+            label_subgraph_nodes=True,
+            verbose=True,
+            save_as=output_file,
+        )
+    
+        # Save the settings to a JSON file
+        with open(settings_file, "w", encoding="utf8") as f:
+            json.dump(
+                {
+                    "input_file": str(input_file),
+                    "output_file": str(output_file),
+                    "layout_kwargs": layout_kwargs,
+                    "plotting_kwargs": plotting_kwargs,
+                }, f, indent=4, ensure_ascii=False)
+            logging.info(f"Settings saved to {settings_file}")
+
+    logging.info(f"See results in {input_file.parent}")
+    return
+
+if __name__ == "__main__":
+    main()
