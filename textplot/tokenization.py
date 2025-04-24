@@ -17,11 +17,13 @@ from typing import List, Set, Generator, Dict, Optional, Union
 from gensim.models.phrases import Phrases
 
 import spacy
+from spacy.attrs import ORTH, NORM # for special token cases
 from spacy.tokens import Doc, Token
 from spacy.language import Language
 
 # Import your connector word sets or define them here
-from textplot.constants import CONNECTOR_WORDS, BAR_FORMAT
+from textplot.constants import CONNECTOR_WORDS, BAR_FORMAT, ALLOWED_UPOS
+from textplot.utils import parse_wordlists
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -36,16 +38,18 @@ class PhrasalTokenizer:
     
     def __init__(
         self,
-        lang: str = None,
+        lang: str = 'en',
         min_count: int = 3,
         threshold: float = 0.6,
         scoring: str = "npmi",
-        stopwords: str = None,
+        phrase_lemma: str = "full", # NOTE: "full" seems to work best
+        custom_stopwords: Optional[List[str]] = None,
+        custom_stopwords_file: Optional[str] = None,
+        custom_connector_words: Optional[List[str]] = None,
+        custom_connector_words_file: Optional[str] = None,
+        labels: Optional[List[str]] = None, 
         allowed_upos: Optional[Set[str]] = None,
-        connector_words: Optional[Set[str]] = None,
         disable: Optional[List[str]] = None,
-        phrase_lemma: Optional[str] = "full", # NOTE: "full" seems to work best
-        prefilter: Optional[bool] = False,
         **kwargs,
     ):
         """
@@ -60,71 +64,93 @@ class PhrasalTokenizer:
             connector_words: Set of words that can appear inside phrases
             disable: spaCy pipeline components to disable
         """
+        # spacy nlp arguments
         self.lang = lang
+        # optional spacy arguments
+        self.allowed_upos = allowed_upos or ALLOWED_UPOS
+        self.labels = labels or []
+        self.disable = disable or ['ner', 'textcat']  # Default components to disable
+
+        # phrase detection arguments
+        self.phraser_model = None
         self.min_count = min_count
         self.threshold = threshold
         self.scoring = scoring
-        self.allowed_upos = allowed_upos or set()
-        self.phraser_model = None
         self.phrase_lemma = phrase_lemma
-        self.prefilter = prefilter
-                
-        # Set default disabled components if none provided
-        if disable is None:
-            disable = ['ner', 'textcat']
-        
-        # Load appropriate spaCy model and connector words based on language
-        if lang is None:
-            logger.warning(
-                "Language not specified when initializing PhrasalTokenizer. Defaulting to English. " \
-                "If you want to use a different language, please specify it using the '--lang' parameter."
-                )
-            lang = 'en'
 
+        self.nlp = self._load_spacy_model()
+        self._add_tokenizer_exceptions()
+
+        self._register_extensions()
+        
+        self._load_custom_stopwords(custom_stopwords, custom_stopwords_file)
+        self._load_connector_words(custom_connector_words, custom_connector_words_file)
+
+        logger.debug(f"Allowed UPOS tags: {self.allowed_upos}")
+
+    def _load_spacy_model(self):
+        """ Load the appropriate spaCy model for the specified language """
         try:
-            if lang == 'en':
-                self.nlp = spacy.load('en_core_web_sm', disable=disable)
-            elif lang == 'de':
-                self.nlp = spacy.load('de_core_news_sm', disable=disable)
-            elif lang == 'fr':
-                self.nlp = spacy.load('fr_core_news_sm', disable=disable)        
-            elif lang == 'it':
-                self.nlp = spacy.load('it_core_news_sm', disable=disable)
+            if self.lang == 'en':
+                nlp = spacy.load('en_core_web_sm', disable=self.disable)
+            elif self.lang == 'de':
+                nlp = spacy.load('de_core_news_sm', disable=self.disable)
+            elif self.lang == 'fr':
+                nlp = spacy.load('fr_core_news_sm', disable=self.disable)
+            elif self.lang == 'it':
+                nlp = spacy.load('it_core_news_sm', disable=self.disable)
             else:
-                raise ValueError(f"Unsupported language: {lang}")
+                raise ValueError(f"Unsupported language: {self.lang}")
         except OSError:
             raise OSError(
-                f"Language model for '{lang}' not found. " \
-                f"Please install the appropriate spaCy model. " \
-                f"Example: `python -m spacy download {lang}_core_news_sm`"
+                f"Language model for '{self.lang}' not found. "
+                f"Please install the appropriate spaCy model. "
+                f"Example: `python -m spacy download {self.lang}_core_news_sm`"
             )
-        
-        logger.info(f"Initialized PhrasalTokenizer with language: {lang}")
-        logger.info(f"Hyperparameters for Phrase Detection: min_count: {min_count}, threshold: {threshold}, scoring: {scoring}")
-        logger.info(f"Allowed UPOS tags: {allowed_upos}")
-        
-        # Load stopwords if provided
-        if stopwords and Path(stopwords).is_file():
-            with open(stopwords) as f:
-                user_stopwords = set(f.read().splitlines())
-        else:
-            user_stopwords = set()
-        
-        # update the nlp pipeline with user-defined stopwords
-        self.nlp.Defaults.stop_words.update(user_stopwords)
-        logger.info(f"Loaded custom stopwords from {stopwords}" if stopwords else "No custom stopwords file provided.")
-        logger.info(f"Number of stopwords: {len(self.nlp.Defaults.stop_words)}")
 
-        self.connector_words = connector_words or CONNECTOR_WORDS[lang]
-        # Extend connector words with punctuation
-        self.connector_words.update(string.punctuation)
+        logger.info(f"Initialized PhrasalTokenizer with language: {self.lang}")
+        return nlp
 
-        logger.info(f"Connector words: {self.connector_words}")
+    def _add_tokenizer_exceptions(self):
+        """ Add special cases to the tokenizer for the provided labels """
         
-        # Register the phrase_iob extension if it doesn't exist
+        for label in self.labels:
+            self.nlp.tokenizer.add_special_case(label, [{ORTH: label}])
+            logger.debug(f"Added special case for token: {label}")
+
+    def _register_extensions(self):
+        """ Register custom extensions for tokens """
         if not Token.has_extension("phrase_iob"):
             Token.set_extension("phrase_iob", default="O")
     
+    def _load_custom_stopwords(self, custom_stopwords: Optional[List[str]] = None, custom_stopwords_file: Optional[str] = None):
+        """ Load custom stopwords if a file or list is provided """
+        
+        custom_stopwords = parse_wordlists(
+            wordlist_file=custom_stopwords_file,
+            wordlist=custom_stopwords,
+        )
+            
+        # Update the nlp pipeline with user-defined stopwords
+        self.nlp.Defaults.stop_words.update(custom_stopwords)
+        logger.debug(f"Stopwords: {self.nlp.Defaults.stop_words}")
+    
+    def _load_connector_words(self, custom_connector_words: Optional[List[str]] = None, custom_connector_words_file: Optional[str] = None):
+        """ Load custom connector words if a file or list is provided """
+
+        custom_connector_words = parse_wordlists(
+            wordlist_file=custom_connector_words_file,
+            wordlist=custom_connector_words,
+        )
+
+        # Update the connector words with user-defined connector words
+        self.connector_words = CONNECTOR_WORDS[self.lang]
+        # Extend connector words with punctuation and custom connector words
+        self.connector_words.update(string.punctuation)
+        self.connector_words.update(custom_connector_words)
+        logger.debug(f"Connector words: {self.connector_words}")
+        
+
     def learn_phrases(self, docs: List[Doc]) -> Phrases:
         """
         Learn phrases from a list of spaCy Doc objects.
@@ -135,6 +161,9 @@ class PhrasalTokenizer:
         Returns:
             A Phrases object containing the learned phrases
         """
+
+        logger.debug(f"Hyperparameters for Phrase Detection: min_count: {self.min_count}, threshold: {self.threshold}, scoring: {self.scoring}")
+        
         bigram_model = Phrases(
             min_count=self.min_count, 
             threshold=self.threshold, 
@@ -150,9 +179,11 @@ class PhrasalTokenizer:
         )
         
         for doc in tqdm(docs, total=len(docs), desc="Learning phrases...", bar_format=BAR_FORMAT):
-            doc_sent_tokens = [[token.text for token in sent if not token.is_space] for sent in doc.sents]
+            # doc_sent_tokens = [[token.text for token in sent if is_valid_token(token)] for sent in doc.sents]
+            doc_sent_tokens = [[token.text for token in sent] for sent in doc.sents]
             # Apply the bigram model to the sentences
             bigram_model.add_vocab(doc_sent_tokens)
+            
             # Apply the trigram model to the sentences
             trigram_model.add_vocab(bigram_model[doc_sent_tokens])
 
@@ -280,31 +311,64 @@ class PhrasalTokenizer:
         if not Token.has_extension("phrase_iob"):
             raise ValueError("Doc tokens don't have 'phrase_iob' extension. Run add_phrase_iob_annotations first.")
         
+        def is_valid_token(token: Token) -> bool:
+            """
+            Determine if a token is valid for extraction based on specific criteria.
+
+            Invalid tokens are:
+                - stopwords
+                - punctuation
+                - spaces
+                - digits
+                - tokens with UPOS tags not in the allowed set
+            Valid tokens are:
+                - tokens marked as labels
+                - tokens with UPOS tags in the allowed set
+            """
+            
+            # if the token is a label, return True
+            # (this is to ensure that labels are not excluded by the allowed_upos)
+            if self.labels and token.text in self.labels:
+                return True
+            
+            # if the token meets any of the invalid criteria, return False
+            if token.is_stop:
+                return False
+            
+            if token.is_punct:
+                return False
+            
+            if token.is_space:
+                return False
+            
+            if token.is_digit:
+                return False
+            
+            if isinstance(self.allowed_upos, set) and token.pos_ not in self.allowed_upos:
+                return False
+            
+            # otherwise, it's a valid token
+            return True
+
         i = 0
         while i < len(doc):
             token = doc[i]
             
             # If token is outside any phrase
             if token._.phrase_iob == "O":
-                # Skip token if it is a stopword
-                if token.is_stop or token.is_punct or token.is_space or token.is_digit:
+                if not is_valid_token(token):
                     i += 1
                     continue
-
-                # Skip token if it is an excluded UPOS tag
-                if self.prefilter and self.allowed_upos and token.pos_ not in self.allowed_upos:
+                else:
+                    yield {"unstemmed": token.text, "stemmed": token.lemma_, "pos": token.pos_}
                     i += 1
-                    continue
-
-                yield {"unstemmed": token.text, "stemmed": token.lemma_, "pos": token.pos_}
-                i += 1
                 
             # If token is the beginning of a phrase
-            elif token._.phrase_iob == "B":
+            elif token._.phrase_iob == "B" and not token.text in self.labels:
                 # Find the end of this phrase
                 phrase_tokens = [token]
                 j = i + 1
-                while j < len(doc) and doc[j]._.phrase_iob == "I":
+                while j < len(doc) and doc[j]._.phrase_iob == "I" and not token.text in self.labels:
                     phrase_tokens.append(doc[j])
                     j += 1
                 
@@ -332,6 +396,7 @@ class PhrasalTokenizer:
                 yield {"unstemmed": token.text, "stemmed": token.lemma_, "pos": token.pos_}
                 i += 1
     
+
     def tokenize(
         self, 
         text: str, 
@@ -469,15 +534,4 @@ if __name__ == "__main__":
     # Print the tokenized output
     for token in tokenizer.tokenize(text, verbose=True):
         print(token)
-    
-    # # # Example of saving and loading a model
-    # # # tokenizer.save("phraser_model.pkl")
-    # # # new_tokenizer = PhrasalTokenizer(lang="en")
-    # # # new_tokenizer.load("phraser_model.pkl")
-
-    # # # Example of using the LegacyTokenizer
-    # tokenizer = LegacyTokenizer()
-    # tokenizer.fit(text)
-    # for token in tokenizer.tokenize(text):
-    #     print(token)
     

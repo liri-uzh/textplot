@@ -81,14 +81,7 @@ class Text:
         self.terms = None
         
         if kwargs.get('tokenizer') in ['spacy', 'phrasal']:
-            self.tokenizer = PhrasalTokenizer(
-                lang=kwargs.get('lang', None),
-                min_count=kwargs.get('phrase_min_count', 3),
-                threshold=kwargs.get('phrase_threshold', 0.6),
-                scoring=kwargs.get('phrase_scoring', 'npmi'),
-                allowed_upos=kwargs.get('allowed_upos', None),
-                stopwords=kwargs.get('stopwords', None),
-                )
+            self.tokenizer = PhrasalTokenizer(**kwargs)
         else:
             self.tokenizer = LegacyTokenizer(**kwargs)
 
