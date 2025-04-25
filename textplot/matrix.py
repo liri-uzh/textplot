@@ -1,6 +1,3 @@
-
-
-import numpy as np
 import textplot.utils as utils
 
 from itertools import combinations
@@ -10,20 +7,16 @@ from collections import OrderedDict
 from tqdm import tqdm
 from textplot.constants import BAR_FORMAT
 
+
 class Matrix:
-
-
     def __init__(self):
-
         """
         Initialize the underlying dictionary.
         """
 
         self.clear()
 
-
     def clear(self):
-
         """
         Reset the pair mappings and key set.
         """
@@ -31,9 +24,7 @@ class Matrix:
         self.keys = set()
         self.pairs = {}
 
-
     def key(self, term1, term2):
-
         """
         Get an order-independent key for a pair of terms.
 
@@ -47,9 +38,7 @@ class Matrix:
 
         return tuple(sorted((term1, term2)))
 
-
     def set_pair(self, term1, term2, value, **kwargs):
-
         """
         Set the value for a pair of terms.
 
@@ -63,9 +52,7 @@ class Matrix:
         self.keys.update([term1, term2])
         self.pairs[key] = value
 
-
     def get_pair(self, term1, term2):
-
         """
         Get the value for a pair of terms.
 
@@ -80,9 +67,7 @@ class Matrix:
         key = self.key(term1, term2)
         return self.pairs.get(key, None)
 
-
     def index(self, text, terms=None, **kwargs):
-
         """
         Index all term pair distances.
 
@@ -100,15 +85,14 @@ class Matrix:
         count = comb(len(terms), 2)
 
         # for t1, t2 in bar(pairs, expected_size=count, every=1000):
-        for t1, t2 in tqdm(pairs, total=count, desc="Indexing terms...", bar_format=BAR_FORMAT):
-
+        for t1, t2 in tqdm(
+            pairs, total=count, desc="Indexing terms...", bar_format=BAR_FORMAT
+        ):
             # Set the Bray-Curtis distance.
             score = text.score_braycurtis(t1, t2, **kwargs)
             self.set_pair(t1, t2, score)
 
-
     def anchored_pairs(self, anchor):
-
         """
         Get distances between an anchor term and all other terms.
 
@@ -123,6 +107,7 @@ class Matrix:
 
         for term in self.keys:
             score = self.get_pair(anchor, term)
-            if score: pairs[term] = score
+            if score:
+                pairs[term] = score
 
         return utils.sort_dict(pairs)

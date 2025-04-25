@@ -5,14 +5,18 @@ from typing import Optional
 from collections import OrderedDict
 from itertools import islice
 
+
 def load_words_from_file(file_path: str) -> list:
     """
     Load words (e.g. stopwords, connectors, etc.) from a file into a list.
     """
-    with open(file_path, 'r') as f:
+    with open(file_path, "r") as f:
         return [line.strip() for line in f]
 
-def parse_wordlists(wordlist_file: Optional[str] = None, wordlist: Optional[list] = None) -> list:
+
+def parse_wordlists(
+    wordlist_file: Optional[str] = None, wordlist: Optional[list] = None
+) -> list:
     words = set()
     if wordlist_file:
         words.update(load_words_from_file(wordlist_file))
@@ -20,8 +24,8 @@ def parse_wordlists(wordlist_file: Optional[str] = None, wordlist: Optional[list
         words.update(wordlist)
     return words
 
-def sort_dict(d, desc=True):
 
+def sort_dict(d, desc=True):
     """
     Sort an ordered dictionary by value, descending.
 
@@ -38,7 +42,6 @@ def sort_dict(d, desc=True):
 
 
 def window(seq, n=2):
-
     """
     Yield a sliding window over an iterable.
 

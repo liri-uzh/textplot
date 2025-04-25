@@ -1,5 +1,3 @@
-
-
 import networkx as nx
 import matplotlib.pyplot as plt
 
@@ -8,25 +6,20 @@ from abc import ABCMeta, abstractmethod
 from tqdm import tqdm
 from textplot.constants import BAR_FORMAT
 
+
 class Graph(metaclass=ABCMeta):
-
-
     def __init__(self):
-
         """
         Initialize the graph.
         """
 
         self.graph = nx.Graph()
 
-
     @abstractmethod
     def build(self):
         pass
 
-
     def draw_spring(self, save_as: str = None, **kwargs):
-
         """
         Render a spring layout.
         """
@@ -35,20 +28,18 @@ class Graph(metaclass=ABCMeta):
             self.graph,
             with_labels=True,
             font_size=10,
-            edge_color='#dddddd',
+            edge_color="#dddddd",
             node_size=0,
-            **kwargs
+            **kwargs,
         )
 
         if save_as:
-            plt.savefig(save_as, format='png', dpi=300, bbox_inches='tight')
+            plt.savefig(save_as, format="png", dpi=300, bbox_inches="tight")
             print(f"Graph saved as {save_as}")
         else:
             plt.show()
 
-
     def write_gml(self, path):
-
         """
         Write a GML file.
 
@@ -58,9 +49,7 @@ class Graph(metaclass=ABCMeta):
 
         nx.write_gml(self.graph, path)
 
-
     def write_graphml(self, path):
-
         """
         Write a GraphML file.
 
@@ -72,10 +61,7 @@ class Graph(metaclass=ABCMeta):
 
 
 class Skimmer(Graph):
-
-
     def build(self, text, matrix, skim_depth=10, d_weights=False):
-
         """
         1. For each term in the passed matrix, score its KDE similarity with
         all other indexed terms.
@@ -91,17 +77,18 @@ class Skimmer(Graph):
         """
 
         # breakpoint()
-        for anchor in tqdm(matrix.keys, desc="Building graph...", bar_format=BAR_FORMAT):
-
+        for anchor in tqdm(
+            matrix.keys, desc="Building graph...", bar_format=BAR_FORMAT
+        ):
             n1 = text.unstem(anchor)
 
             # Heaviest pair scores:
             pairs = matrix.anchored_pairs(anchor).items()
             for term, weight in list(pairs)[:skim_depth]:
-
                 # If edges represent distance, use the complement of the raw
                 # score, so that similar words are connected by "short" edges.
-                if d_weights: weight = 1-weight
+                if d_weights:
+                    weight = 1 - weight
 
                 n2 = text.unstem(term)
 

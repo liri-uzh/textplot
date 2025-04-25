@@ -21,7 +21,7 @@ class TestCorpusLoading:
             "file2.txt",
             "subdir/file3.txt",
             "subdir/file4.md",
-            "other.md"
+            "other.md",
         ]
 
         self.sample_texts = [
@@ -29,23 +29,29 @@ class TestCorpusLoading:
             "This is the second test file with different words.",
             "This third file contains nested directory content.",
             "This markdown file should be loadable with the right pattern.",
-            "This MD file should not be loaded with the default pattern."
+            "This MD file should not be loaded with the default pattern.",
         ]
 
         # Create the files with content
         for i, filepath in enumerate(self.sample_files):
             full_path = Path(self.test_dir) / filepath
             full_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(full_path, 'w') as f:
+            with open(full_path, "w") as f:
                 f.write(self.sample_texts[i])
 
         # Simple stopwords for testing
         self.stopwords = ["is", "the", "with", "this"]
         self.stopwords_file = Path(self.test_dir) / "stopwords.txt"
-        with open(self.stopwords_file, 'w') as f:
+        with open(self.stopwords_file, "w") as f:
             f.write("\n".join(self.stopwords))
 
-        yield self.test_dir, self.sample_files, self.sample_texts, self.stopwords, self.stopwords_file
+        yield (
+            self.test_dir,
+            self.sample_files,
+            self.sample_texts,
+            self.stopwords,
+            self.stopwords_file,
+        )
 
         # Clean up test fixtures
         shutil.rmtree(self.test_dir)

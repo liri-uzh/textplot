@@ -1,10 +1,7 @@
-
-
 from textplot.utils import window
 
 
 def test_window():
-
     """
     window() should generate a sliding window over an iterable.
     """
