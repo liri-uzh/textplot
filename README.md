@@ -47,14 +47,15 @@ To construct a network from a corpus input (a single text file, a directory of f
 
 ```bash
 python -m textplot.helpers \
-    data/corpora/human_rights.txt \
+    data/corpora/human_rights/en/human_rights.txt \
     --tokenizer spacy \
     --lang en \
     --allowed_upos NOUN \
-    --stopwords textplot/data/stopwords.txt \
+    --custom_stopwords_file textplot/data/stopwords.txt \
+    --custom_stopwords "article" \
     --phrase_min_count 6 --phrase_threshold 0.6 \
     --bandwidth 2000 --term_depth 200 --skim_depth 5 -d \
-    --output_dir data/outputs
+    --output_dir data/outputs/human_rights \
 ```
 
 This first command processes the text file `data/corpora/human_rights.txt` using SpaCy for tokenization and lemmatization, filters the terms based on their UPOS tags (in this case, only nouns), and applies phrase detection with Gensim. 
@@ -84,14 +85,32 @@ An example of the resulting network with `pyvis` is shown below:
 
 For a full list of options, run `python -m textplot.helpers --help`.
 
+### Working with labelled data
+
+If you have labelled data, you can use the `--labels` option to specify the labels used. 
+This ensures that labels are included in the network even if they are tagged as stopwords or filtered out by the part-of-speech filter.
+For example, the 8set dataset contains texts labelled with positive and negative sentiment (`sentinegative` and `sentipositive`).
+
+```bash
+python -m textplot.helpers \
+    data/corpora/8set/8set_ALL.name_text_source_ASCII_cleaned_w_sentiment_h1k.txt \
+    --tokenizer spacy \
+    --lang en \
+    --labels "sentinegative" "sentipositive" \
+    --phrase_min_count 6 --phrase_threshold 0.6 \
+    --bandwidth 20000 --term_depth 200 --skim_depth 5 -d \
+    --output_dir data/outputs/8set
+```
+
+
 ## TODOs
 
 - [ ] ~~pre vs. post filtering for POS, key terms, sudo words etc.~~
-- [ ] add support for sudo words (these are words that need to be kept for the analysis, but are ultimately visualised in the network)
-- [ ] re-scoring and filtering with TF-IDF (needs document boundaries or reference corpus)
+- [x] add support for sudo words (these are words that need to be kept for the analysis, but are ultimately visualised in the network)
 - [x] ~~intermediate output of .gml files for networkx~~
 - [x] ~~remove numbers from outputs~~
-- [ ] improve visualisations with [forceatlas](https://github.com/bhargavchippada/forceatlas2) or post-hoc processing with [gephi](https://gephi.org/)
+- [x] improve visualisations with [forceatlas](https://github.com/bhargavchippada/forceatlas2) or post-hoc processing with [gephi](https://gephi.org/)
+- [ ] re-scoring and filtering with TF-IDF (needs document boundaries or reference corpus)
 
 ## Acknowledgements
 

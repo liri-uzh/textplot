@@ -165,7 +165,8 @@ if __name__ == "__main__":
         preprocessing_kwargs={
             "tokenizer": args.tokenizer,
             "lang": args.lang,
-            "custom_stopwords_file": args.custom_stopwords_file, "custom_stopwords": args.custom_stopwords,
+            "custom_stopwords_file": args.custom_stopwords_file, 
+            "custom_stopwords": args.custom_stopwords,
             "labels": args.labels,
             "allowed_upos": args.allowed_upos,
             "chunk_size": args.chunk_size,
@@ -173,7 +174,8 @@ if __name__ == "__main__":
             "phrase_min_count": args.phrase_min_count,
             "phrase_threshold": args.phrase_threshold,
             "phrase_scoring": args.phrase_scoring,
-            "custom_connector_words_file": args.custom_connector_words_file, "custom_connector_words": args.custom_connector_words,
+            "custom_connector_words_file": args.custom_connector_words_file, 
+            "custom_connector_words": args.custom_connector_words,
         },
         )
 
