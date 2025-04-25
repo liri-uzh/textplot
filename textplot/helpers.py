@@ -27,7 +27,14 @@ Example usage:
 
 """
 
-def set_args():
+def set_args() -> ArgumentParser:
+    """
+    Set the arguments for the script.
+    
+    Returns:
+        ArgumentParser: The argument parser.
+    """
+    
     parser = ArgumentParser(description="Build a graph from a text corpus.")
     
     # corpus options
@@ -112,7 +119,7 @@ def build_graph(
 
 
 
-def infer_output_filename_from_args(args):
+def infer_output_filename_from_args(args: ArgumentParser) -> Path:
     """
     Infer the output filename from the arguments.
     Args:
@@ -185,16 +192,9 @@ if __name__ == "__main__":
     output_file_path = infer_output_filename_from_args(args)
 
     # Write the graph to a GML file
-    g.write_gml(output_file_path.with_suffix(".gml")) # GML format
-    g.write_graphml(output_file_path.with_suffix(".graphml")) # XML format
-    logging.info(f"Graphs written to {output_file_path}.gml and {output_file_path}.graphml")
-
-    # g.draw_spring(
-    #     # node_size=args.node_size,
-    #     save_as=output_file_path.with_suffix(".png"),
-    #     # with_labels=True,
-    #     # font_size=args.font_size,
-    #     # alpha=0.5,
-    #     # edge_color="#dddddd",
-    #     # **args.__dict__
-    # )
+    g.write_gml(f"{output_file_path}.gml") # GML format
+    logging.info(f"Graph written to {output_file_path}.gml")
+    
+    # Write the graph to a GraphML file
+    # g.write_graphml(f"{output_file_path}.graphml") # XML format
+    # logging.info(f"Graph written to {output_file_path}.graphml")
