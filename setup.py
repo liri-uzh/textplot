@@ -9,9 +9,13 @@ setup(
     license="MIT",
     author="David McClure",
     author_email="davidwilliammcclure@gmail.com",
-    scripts=["bin/textplot"],
     packages=find_packages(),
     package_data={"textplot": ["data/*"]},
+    entry_points={
+            'console_scripts': [
+                'textplot = textplot.__main__:textplot'
+            ]
+        },
     install_requires=[
         "scikit-learn",
         "numpy",
@@ -22,5 +26,7 @@ setup(
         "clint",
         "pytest",
         "click",
+        "gensim",
+        "spacy",
     ],
 )

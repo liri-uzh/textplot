@@ -31,6 +31,7 @@ uv pip install -r requirements.txt
 conda create -n textplot python=3.11
 conda activate textplot
 pip install -r requirements.txt
+pip install . # install textplot for command line usage
 
 # Install the language models for SpaCy
 python -m spacy download en_core_web_sm
@@ -41,9 +42,18 @@ python -m spacy download it_core_news_sm
 
 ## Usage
 
-To construct a network from a corpus input (a single text file, a directory of files), we follow a two-step process:
+### Command Line
 
-1. Use the `helpers.py` script to process the text and compute the network:
+To use the package, you can either run the `textplot` command line tool or import the package in your Python code.
+The command line tool provides a simple interface for generating a gml file from a text file.
+
+```bash
+textplot generate data/corpora/war-and-peace/war-and-peace.txt data/outputs/war-and-peace.gml
+```
+
+### Python
+
+Alternatively, you can run it as a Python module, using the `textplot/helpers.py` script to process the text and compute the network:
 
 ```bash
 python -m textplot.helpers \
@@ -58,26 +68,25 @@ python -m textplot.helpers \
     --output_dir data/outputs/human_rights \
 ```
 
-This first command processes the text file `data/corpora/human_rights.txt` using SpaCy for tokenization and lemmatization, filters the terms based on their UPOS tags (in this case, only nouns), and applies phrase detection with Gensim. 
+This command processes the text file `data/corpora/human_rights.txt` using SpaCy for tokenization and lemmatization, filters the terms based on their UPOS tags (in this case, only nouns), and applies phrase detection with Gensim. 
 By default, this will create 3 output files in the output directory:
 - `<network>.gml`: The network in GML format, which can be opened with [Gephi](https://gephi.org/).
-- `<network>.graphml`: The network in GraphML format (XML).
 
 
-2. Use the `plotting.py` script to visualize the network:
+## Plotting
+
+Once you have generated a `.gml` file, you can visualize the network using the `textplot/plotting.py` script or import it into a graph visualization tool like Gephi.
+
+For example, you can use the following command to visualize the network using the `plotting.py` script:
 
 ```bash
 python -m textplot.plotting data/outputs/human_rights-td200-sd5-bw2000-dwFalse.gml
 ```
 
-The second command takes the gml file generated in the first step and visualizes the network using the `plotting.py` script.
 By default, the script runs a series of layout hyperparameters and saves the output png and json files in the same directory as the input file. 
 This allows for quick exploration of potential layouts and visualizations for a given network.
 If you do not want to explore the layout hyperparameters, you can specify `--no_trials`, in which case, the script will only generate a single plot with the layout parameters specified in the command line.
 In this case, the `--iterations` parameter controls the number of iterations for the force-directed layout algorithm, and the `--layout_algorithm` parameter specifies which layout algorithm to use. In this case, we are using the ForceAtlas2 algorithm. Run `python -m textplot.plotting --help` for more options.
-
-
-Note, make sure to replace `data/corpora/human_rights.txt` with the path to your text file or directory of files. 
 
 An example of the resulting network with `pyvis` is shown below:
 
@@ -85,7 +94,7 @@ An example of the resulting network with `pyvis` is shown below:
 
 For a full list of options, run `python -m textplot.helpers --help`.
 
-### Working with labelled data
+## Working with labelled data
 
 If you have labelled data, you can use the `--labels` option to specify the labels used. 
 This ensures that labels are included in the network even if they are tagged as stopwords or filtered out by the part-of-speech filter.
