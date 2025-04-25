@@ -37,14 +37,19 @@ def set_args():
     # tokenization options
     parser.add_argument("--tokenizer", default=None, type=str, choices=["spacy", "legacy", None], help="Tokenization method. If None, use the legacy regex tokenizer.")
     parser.add_argument("--lang", default=None, type=str, help="Language for spacy tokenizer. If not provided, we assume English.")
-    parser.add_argument("--stopwords", default=None, type=str, help="Path to stopwords file. Note, if using spacy, stopwords in this file will be added to the spacy stopwords list.")
-    parser.add_argument("--allowed_upos", nargs="*", default=["ADJ", "ADV", "INTJ", "NOUN", "PROPN", "VERB"], help="List of UPOS tags to exclude. See list here: https://universaldependencies.org/u/pos/. By default, we use open-class words only.")
-    parser.add_argument("--chunk_size", default=1000, type=int, help="Chunk size for tokenization. If using spacy, this is the number of words to process at a time.")
     
+    parser.add_argument("--custom_stopwords_file", default=None, type=str, help="Path to custom stopwords file. Note, if using spacy, words provided through this argument will be added to the spacy stopwords list.")
+    parser.add_argument("--custom_stopwords", nargs="*", default=None, type=str, help="List of custom stopwords. Note, if using spacy, words provided through this argument will be added to the spacy stopwords list.")
+    parser.add_argument("--labels", nargs="*", default=None, type=str, help="List of labels if used to annotate the texts. These words will be retained even if they are not in the allowed_upos list.")
+    parser.add_argument("--allowed_upos", nargs="*", default=None, type=str, help="List of UPOS tags to exclude. See list here: https://universaldependencies.org/u/pos/. By default, we use open-class words only.")
+    parser.add_argument("--chunk_size", default=1000, type=int, help="Chunk size for tokenization. If using spacy, this is the number of words to process at a time.")
+
     # phrase extraction options
     parser.add_argument("--phrase_min_count", default=3, type=int, help="Minimum occurrence count for a candidate phrase.")
     parser.add_argument("--phrase_threshold", default=0.8, type=float, help="Threshold for phrase scorer.")
     parser.add_argument("--phrase_scoring", default="npmi", type=str, choices=["npmi", "default"], help="Scoring method for phrases.")
+    parser.add_argument("--custom_connector_words_file", default=None, type=str, help="Path to custom connector words file, which will be added to the default connector words list (see textplot/constants.py for more info).")
+    parser.add_argument("--custom_connector_words", nargs="*", default=None, type=str, help="List of custom connector words, which will be added to the default connector words list (see textplot/constants.py for more info).")
     
     # logging options
     parser.add_argument('-d', '--debug', action="store_const", dest="loglevel", const=logging.DEBUG, default=logging.WARNING, help="Print DEBUG level messages")
@@ -72,6 +77,7 @@ def build_graph(
     term_depth: int = 1000, 
     skim_depth: int = 10,
     d_weights: bool = False, 
+    preprocessing_kwargs: Dict[str, Any] = {},
     **kwargs: Any) -> Skimmer:
 
     """
@@ -87,8 +93,9 @@ def build_graph(
         Skimmer: The indexed graph.
     """
 
-    # Load the text and tokenize    
-    t = Text(corpus_like_object, **kwargs)
+    # Load the text and tokenize
+    # print(preprocessing_kwargs)
+    t = Text(corpus_like_object, **preprocessing_kwargs)
     logging.info(f'Extracted {len(t.tokens)} tokens')
 
     m = Matrix()
@@ -151,15 +158,25 @@ if __name__ == "__main__":
     # returns a Skimmer object  
     g = build_graph(
         args.corpus, 
-        tokenizer=args.tokenizer, 
-        lang=args.lang, 
-        stopwords=args.stopwords,
-        allowed_upos=set(args.allowed_upos),
-        chunk_size=args.chunk_size,
-        file_pattern=args.file_pattern,
-        phrase_min_count=args.phrase_min_count,
-        phrase_threshold=args.phrase_threshold,
-        phrase_scoring=args.phrase_scoring,
+        term_depth=args.term_depth,
+        skim_depth=args.skim_depth,
+        d_weights=args.d_weights,
+        bandwidth=args.bandwidth,
+        preprocessing_kwargs={
+            "tokenizer": args.tokenizer,
+            "lang": args.lang,
+            "custom_stopwords_file": args.custom_stopwords_file, 
+            "custom_stopwords": args.custom_stopwords,
+            "labels": args.labels,
+            "allowed_upos": args.allowed_upos,
+            "chunk_size": args.chunk_size,
+            "file_pattern": args.file_pattern,
+            "phrase_min_count": args.phrase_min_count,
+            "phrase_threshold": args.phrase_threshold,
+            "phrase_scoring": args.phrase_scoring,
+            "custom_connector_words_file": args.custom_connector_words_file, 
+            "custom_connector_words": args.custom_connector_words,
+        },
         )
 
     logging.info(f"Graph built with {len(g.graph.nodes)} nodes and {len(g.graph.edges)} edges")

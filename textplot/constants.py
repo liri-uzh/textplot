@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# Connector words are passed to the Gensim Phrase model to help it identify phrases in the text. See https://radimrehurek.com/gensim/models/phrases.html#gensim.models.phrases.Phrases
 CONNECTOR_WORDS = {
     'en': set([
         'without', 'a', 'to', 'by', 'of', 'and', 'at', 'or', 'for', 'an', 'from', 'in', 'on', 'the', 'with',
@@ -31,6 +32,9 @@ CONNECTOR_WORDS = {
         'questo', 'questa', 'questi', 'queste', 'quello', 'quella', 'quelli', 'quelle', 'tale', 'tali', 'quale', 'quali', 'chi', 'di cui', 'il cui', 'la cui', 'i cui', 'le cui'
     ])
 }
+
+ALLOWED_UPOS = {"ADJ", "ADV", "NOUN", "PROPN", "VERB"}
+
 
 # format for progress bar in tqdm
 # BAR_FORMAT = '{l_bar}{bar:10}{r_bar}{bar:-10b}'
