@@ -288,7 +288,6 @@ CONNECTOR_WORDS = {
 
 ALLOWED_UPOS = {"ADJ", "ADV", "NOUN", "PROPN", "VERB"}
 
-
 # format for progress bar in tqdm
 # BAR_FORMAT = '{l_bar}{bar:10}{r_bar}{bar:-10b}'
 BAR_FORMAT = "{desc}{percentage:3.0f}%|{bar:10}{r_bar}"

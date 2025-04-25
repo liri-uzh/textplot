@@ -2,9 +2,11 @@ import matplotlib.pyplot as plt
 import textplot.utils as utils
 from textplot.tokenization import LegacyTokenizer, PhrasalTokenizer
 import numpy as np
+import logging
+import re
+import io
 
 from pathlib import Path
-from tqdm import tqdm
 
 from nltk.stem import PorterStemmer
 from sklearn.neighbors import KernelDensity
@@ -12,140 +14,134 @@ from collections import OrderedDict, Counter
 from scipy.spatial import distance
 from functools import lru_cache
 
-from textplot.constants import BAR_FORMAT
 
+logger = logging.getLogger(__name__)
 
+# try:
+# 	from memory_profiler import profile # Import the profile decorator
+# except ImportError:
+# 	def profile(func): # Create a dummy decorator if memory_profiler is not available
+# 		return func
 class Text:
-    @staticmethod
-    def _read_file(file_path, **kwargs):
-        """Helper method to read a single file."""
-        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-            return f.read()
-
-    @staticmethod
-    def _read_directory(dir_path, file_pattern="*.txt", recursive=True, **kwargs):
-        """Helper method to read files from a directory."""
-        path = Path(dir_path)
-        texts = []
-        glob_pattern = "**/" + file_pattern if recursive else file_pattern
-
-        for file_path in tqdm(
-            list(path.glob(glob_pattern)),
-            desc="Loading files...",
-            bar_format=BAR_FORMAT,
-        ):
-            try:
-                texts.append(Text._read_file(file_path))
-            except Exception as e:
-                print(f"Error reading {file_path}: {e}")
-
-        return texts
-
-    @staticmethod
-    def _combine_texts(texts, separator="\n\n", **kwargs):
-        """Helper method to combine multiple texts."""
-        return separator.join(texts)
-
-    @classmethod
-    def from_file(cls, path, **kwargs):
-        """Create a text from a file."""
-        content = cls._read_file(path)
-        return cls(content, **kwargs)
-
-    @classmethod
-    def from_directory(
-        cls, directory_path, file_pattern="*.txt", recursive=True, **kwargs
-    ):
-        """Create a text from multiple files in a directory."""
-        texts = cls._read_directory(directory_path, file_pattern, recursive)
-        return cls.from_texts(texts, **kwargs)
-
-    @classmethod
-    def from_texts(cls, texts, separator="\n\n", **kwargs):
-        """Create a text from a list of text strings."""
-        combined_text = cls._combine_texts(texts, separator)
-        return cls(combined_text, **kwargs)
 
     def __init__(self, corpus_like_object, **kwargs):
         """
-        Initialize a Text object from various input sources.
+        Initialize a Text object from various input sources, supporting efficient streaming.
 
         Args:
             corpus_like_object: Raw text, file path, directory path, file-like object, or list of strings
-            stopwords: Path to stopwords file
-            tokenizer: Name of tokenizer to use
         """
-        self.text = self._process_input(corpus_like_object, **kwargs)
+        self.input = corpus_like_object
+        self.input_type = self._detect_input_type(corpus_like_object, **kwargs)
+        self.kwargs = kwargs
         self.tokens = None
         self.terms = None
-
-        if kwargs.get("tokenizer") in ["spacy", "phrasal"]:
-            self.tokenizer = PhrasalTokenizer(**kwargs)
-        else:
-            self.tokenizer = LegacyTokenizer(**kwargs)
-
+        self.chunk_size = self.kwargs.pop("chunk_size", 1000)
+        self.chunk_by = self.kwargs.pop("chunk_by", "line")
+        logger.debug(f"Initializing Text object with input type: {self.input_type}")
+        logger.debug(f"Chunk size: {self.chunk_size}, Chunk by: {self.chunk_by}")
         self.tokenize(**kwargs)
 
-    def _process_input(self, corpus_like_object, **kwargs):
-        """
-        Process various input types to extract text content.
 
-        Args:
-            corpus_like_object: Raw text, file path, directory path, file-like object, or list of strings
-
-        Returns:
-            str: Extracted text content
-        """
-
-        # String input (raw text or path)
-        if isinstance(corpus_like_object, str):
-            try:
-                path = Path(corpus_like_object)
-                if path.exists():
-                    if path.is_file():
-                        return self.__class__._read_file(path)
-                    elif path.is_dir():
-                        texts = self.__class__._read_directory(path, **kwargs)
-                        return self.__class__._combine_texts(texts)
-                # Not a valid path, treat as raw text
-                return corpus_like_object
-            except (OSError, TypeError):
-                # Not a valid path, treat as raw text
-                return corpus_like_object
-
-        # List of text strings
-        elif isinstance(corpus_like_object, list) and all(
-            isinstance(i, str) for i in corpus_like_object
-        ):
-            return self.__class__._combine_texts(corpus_like_object)
-
-        # File-like object
-        elif hasattr(corpus_like_object, "read"):
-            return corpus_like_object.read()
-
+    def _detect_input_type(self, obj, **kwargs):
+        if isinstance(obj, str):
+            path = Path(obj)
+            if path.exists():
+                if path.is_file():
+                    return 'file'
+                elif path.is_dir():
+                    return 'directory'
+            return 'string'
+        elif isinstance(obj, list) and all(isinstance(i, str) for i in obj):
+            return 'list'
+        elif hasattr(obj, 'read'):
+            return 'filelike'
         else:
-            raise ValueError(
-                "Unsupported input type. Please provide a file path, directory path, "
-                "file object, or text string."
-            )
+            raise ValueError("Unsupported input type.")
 
+    def iter_lines(self):
+        """
+        Yield lines of text from the input source, streaming efficiently.
+        """
+        if self.input_type == 'file':
+            with open(self.input, 'r', encoding='utf-8') as f:
+                for line in f:
+                    yield line
+        elif self.input_type == 'directory':
+            file_pattern = self.kwargs.get('file_pattern', '*.txt')
+            recursive = self.kwargs.get('recursive', True)
+            glob_pattern = '**/' + file_pattern if recursive else file_pattern
+            for file_path in Path(self.input).glob(glob_pattern):
+                if file_path.is_file():
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        for line in f:
+                            yield line
+        elif self.input_type == 'list':
+            for text in self.input:
+                for line in text.splitlines():
+                    yield line
+        elif self.input_type == 'filelike':
+            self.input.seek(0)
+            for line in self.input:
+                yield line
+        elif self.input_type == 'string':
+            for line in io.StringIO(self.input):
+                yield line
+
+    # @profile
+    def iter_chunks(self):
+        """
+        Yield text chunks from the input source, streaming efficiently.
+        """
+        if self.chunk_by == "word":
+            chunk = []
+            for line in self.iter_lines():
+                tokens = re.split(r"\s+", line.strip())
+                for token in tokens:
+                    if token:
+                        chunk.append(token)
+                    if len(chunk) >= self.chunk_size:
+                        yield " ".join(chunk[:self.chunk_size])
+                        chunk = chunk[self.chunk_size:]
+            if chunk:
+                yield " ".join(chunk)
+        elif self.chunk_by == "line":
+            chunk = []
+            for line in self.iter_lines():
+                chunk.append(line.rstrip("\n"))
+                if len(chunk) >= self.chunk_size:
+                    yield "\n".join(chunk)
+                    chunk = []
+            if chunk:
+                yield "\n".join(chunk)
+        else:
+            raise ValueError(f"Unknown chunking mode: {self.chunk_by}. Expected 'word' or 'line'.")
+    
     def tokenize(self, **kwargs):
         """
-        Tokenize the text.
+        Tokenize the text using the provided tokenizer and streaming chunks.
         """
+        if kwargs.get("tokenizer") in ["spacy", "phrasal"]:
+            self.tokenizer = PhrasalTokenizer(**kwargs)
+            logger.debug("Using PhrasalTokenizer for tokenization.")
+        else:
+            self.tokenizer = LegacyTokenizer(**kwargs)
+            logger.debug("Using LegacyTokenizer for tokenization.")
+
         self.tokens = []
         self.terms = OrderedDict()
-
-        # Generate tokens.
-
-        # for token in utils.tokenize(self.text):
-        for token in self.tokenizer.tokenize(self.text, **kwargs):
-            # Gather the tokens.
+        
+        # Initialize chunk iterator factory which will be used by tokenizer
+        # this allows for multiple iterations of the chunks 
+        # (one for learning phrases and one for tokenization)
+        def chunk_iter_factory():
+            return self.iter_chunks()
+    
+        for token in self.tokenizer.tokenize(chunk_iter_factory, **kwargs):
             self.tokens.append(token)
-
-            # Gather the terms and their offsets.
             offsets = self.terms.setdefault(token["stemmed"], [])
             offsets.append(token["offset"])
+
 
     def term_counts(self):
         """

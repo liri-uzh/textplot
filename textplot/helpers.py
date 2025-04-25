@@ -51,6 +51,7 @@ def set_args() -> ArgumentParser:
         choices=["spacy", "legacy", None],
         help="Tokenization method. If None, use the legacy regex tokenizer.",
     )
+
     parser.add_argument(
         "--lang",
         default=None,
@@ -87,12 +88,25 @@ def set_args() -> ArgumentParser:
     )
     parser.add_argument(
         "--chunk_size",
-        default=1000,
+        default=500,
         type=int,
-        help="Chunk size for tokenization. If using spacy, this is the number of words to process at a time.",
+        help="Number of words or lines per chunk (default: 1000)."
+    )
+    parser.add_argument(
+        "--chunk_by",
+        default="line",
+        type=str,
+        choices=["word", "line"],
+        help="Chunking mode for tokenization. 'word' chunks by words, 'line' chunks by lines.",
     )
 
     # phrase extraction options
+    parser.add_argument(
+        "--skip_phraser",
+        action="store_true",
+        help="If true, skip phrase extraction.",
+    )
+    
     parser.add_argument(
         "--phrase_min_count",
         default=3,
@@ -216,9 +230,14 @@ def build_graph(
         Skimmer: The indexed graph.
     """
 
-    # Load the text and tokenize
-    # print(preprocessing_kwargs)
+    # Initialise the lazy text object and tokenizer
     t = Text(corpus_like_object, **preprocessing_kwargs)
+    # if preprocessing_kwargs.get("tokenizer") in ["spacy", "phrasal"]:
+    #     tokenizer = PhrasalTokenizer(**preprocessing_kwargs)
+    # else:
+    #     tokenizer = LegacyTokenizer(**preprocessing_kwargs)
+
+    # t.tokenize(tokenizer, chunk_size=preprocessing_kwargs.get("chunk_size"), chunk_by=preprocessing_kwargs.get("chunk_by"))
     logging.info(f"Extracted {len(t.tokens)} tokens")
 
     m = Matrix()
@@ -303,7 +322,9 @@ if __name__ == "__main__":
             "labels": args.labels,
             "allowed_upos": args.allowed_upos,
             "chunk_size": args.chunk_size,
+            "chunk_by": args.chunk_by,
             "file_pattern": args.file_pattern,
+            "skip_phraser": args.skip_phraser,
             "phrase_min_count": args.phrase_min_count,
             "phrase_threshold": args.phrase_threshold,
             "phrase_scoring": args.phrase_scoring,
