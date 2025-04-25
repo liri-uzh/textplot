@@ -12,10 +12,14 @@ setup(
     license='MIT',
     author='David McClure',
     author_email='davidwilliammcclure@gmail.com',
-    scripts=['bin/textplot'],
+    # scripts=['bin/textplot'],
     packages=find_packages(),
     package_data={'textplot': ['data/*']},
-
+    entry_points={  # Add this section
+            'console_scripts': [
+                'textplot = textplot.__main__:textplot'  # Adjust if necessary
+            ]
+        },
     install_requires=[
         'scikit-learn',
         'numpy',

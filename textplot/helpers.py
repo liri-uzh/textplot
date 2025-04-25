@@ -6,7 +6,13 @@ from textplot.text import Text
 from textplot.graphs import Skimmer
 from textplot.matrix import Matrix
 
+try:
+    from memory_profiler import profile  # Import the profile decorator
+except ImportError:
+    def profile(func):  # Create a dummy decorator if memory_profiler is not available
+        return func
 
+@profile
 def build_graph(path, term_depth=1000, skim_depth=10,
                 d_weights=False, **kwargs):
 

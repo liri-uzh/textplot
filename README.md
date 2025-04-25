@@ -45,17 +45,13 @@
 
 There are two ways to create graphs - you can use the `textplot` executable from the command line, or, if you want to tinker around with the underlying NetworkX graph instance, you can fire up a Python shell and use the `build_graph()` helper directly.
 
-Either way, first install Textplot. With PyPI:
-
-`pip install textplot`
-
-Or, clone the repo and install the package manually:
+Either way, first install Textplot from this repository:
 
 ```bash
 pyvenv env
 . env/bin/activate
 pip install -r requirements.txt
-python setup.py install
+pip install -e .
 ```
 
 ### From the command line
