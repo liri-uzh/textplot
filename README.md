@@ -20,18 +20,13 @@ To install the package, clone the repository and install the required dependenci
 git clone git@github.com:liri-uzh/textplot.git
 cd textplot
 
-# Create a virtual environment and install the dependencies
-
-# If you have `uv` (https://github.com/astral-sh/uv) installed, you run
-uv venv --python 3.11 --seed
-source .venv/bin/activate
-uv pip install -r requirements.txt
-
-# Otherwise, you can run use conda or any other virtual environment manager, e.g.
+# Create a virtual environment (we recommend conda)
 conda create -n textplot python=3.11
 conda activate textplot
+# Install the dependencies
 pip install -r requirements.txt
-pip install . # install textplot for command line usage
+# Install textplot for command line usage
+pip install .
 
 # Install the language models for SpaCy
 python -m spacy download en_core_web_sm
@@ -69,8 +64,7 @@ python -m textplot.helpers \
 ```
 
 This command processes the text file `data/corpora/human_rights.txt` using SpaCy for tokenization and lemmatization, filters the terms based on their UPOS tags (in this case, only nouns), and applies phrase detection with Gensim. 
-By default, this will create 3 output files in the output directory:
-- `<network>.gml`: The network in GML format, which can be opened with [Gephi](https://gephi.org/).
+By default, this will create a single output file in the output directory with the same name as the input file, but with the `.gml` extension.
 
 
 ## Plotting
