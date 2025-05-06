@@ -244,8 +244,8 @@ class PhrasalTokenizer:
         )
 
         # Stream over chunks, extract sentences, and update the phrase models
-        for chunk in chunk_iter:
-            for doc in tqdm(self.nlp.pipe([chunk], n_process=1), desc="Learning phrases...", bar_format=BAR_FORMAT):
+        for chunk in tqdm(chunk_iter, desc="Learning phrases...", bar_format=BAR_FORMAT):
+            for doc in self.nlp.pipe([chunk], n_process=1):
                 doc_sent_tokens = [[token.text for token in sent] for sent in doc.sents]
                 bigram_model.add_vocab(doc_sent_tokens)
                 trigram_model.add_vocab(bigram_model[doc_sent_tokens])
