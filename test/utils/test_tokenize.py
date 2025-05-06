@@ -1,4 +1,4 @@
-from textplot.utils import tokenize
+from textplot.tokenization import LegacyTokenizer
 
 
 def assert_abc(text):
@@ -9,7 +9,7 @@ def assert_abc(text):
         text (str): A raw text string.
     """
 
-    tokens = tokenize(text)
+    tokens = LegacyTokenizer.tokenize(text)
 
     aa = next(tokens)
     assert aa["stemmed"] == "aa"

@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 from argparse import ArgumentParser
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 
 from textplot.text import Text
@@ -42,6 +42,19 @@ def set_args() -> ArgumentParser:
         type=str,
         help="File pattern for directory input.",
     )
+    parser.add_argument(
+        "--target_column",
+        default=None,
+        type=str,
+        help="Target column for CSV input.",
+    )
+    parser.add_argument(
+        "--sort_by",
+        nargs="*",
+        default=None,
+        type=str,
+        help="Column to sort by for CSV input.",
+    )
 
     # tokenization options
     parser.add_argument(
@@ -51,6 +64,7 @@ def set_args() -> ArgumentParser:
         choices=["spacy", "legacy", None],
         help="Tokenization method. If None, use the legacy regex tokenizer.",
     )
+
     parser.add_argument(
         "--lang",
         default=None,
@@ -87,12 +101,25 @@ def set_args() -> ArgumentParser:
     )
     parser.add_argument(
         "--chunk_size",
-        default=1000,
+        default=1,
         type=int,
-        help="Chunk size for tokenization. If using spacy, this is the number of words to process at a time.",
+        help="Number of words or lines per chunk (default: 1000)."
+    )
+    parser.add_argument(
+        "--chunk_by",
+        default="line",
+        type=str,
+        choices=["word", "line"],
+        help="Chunking mode for tokenization. 'word' chunks by words, 'line' chunks by lines.",
     )
 
     # phrase extraction options
+    parser.add_argument(
+        "--skip_phraser",
+        action="store_true",
+        help="If true, skip phrase extraction.",
+    )
+    
     parser.add_argument(
         "--phrase_min_count",
         default=3,
@@ -216,9 +243,14 @@ def build_graph(
         Skimmer: The indexed graph.
     """
 
-    # Load the text and tokenize
-    # print(preprocessing_kwargs)
+    # Initialise the lazy text object and tokenizer
     t = Text(corpus_like_object, **preprocessing_kwargs)
+    # if preprocessing_kwargs.get("tokenizer") in ["spacy", "phrasal"]:
+    #     tokenizer = PhrasalTokenizer(**preprocessing_kwargs)
+    # else:
+    #     tokenizer = LegacyTokenizer(**preprocessing_kwargs)
+
+    # t.tokenize(tokenizer, chunk_size=preprocessing_kwargs.get("chunk_size"), chunk_by=preprocessing_kwargs.get("chunk_by"))
     logging.info(f"Extracted {len(t.tokens)} tokens")
 
     m = Matrix()
@@ -232,6 +264,55 @@ def build_graph(
     g.build(t, m, skim_depth, d_weights)
 
     return g
+
+
+def prepare_corpus_from_csv(csv_file: str, output_dir: str, target_column: str, sort_by: Optional[List[str]] = None) -> None:
+    """
+    Prepare the CSV file for output.
+
+    Args:
+        csv_file (str): The CSV file to prepare.
+        output_dir (str): The output directory to save the corpus with which we build the graph.
+    """
+
+    import pandas as pd
+
+    if Path(csv_file).suffix == ".csv":
+        df = pd.read_csv(csv_file, sep=",", header=0)
+    elif Path(csv_file).suffix == ".tsv":
+        df = pd.read_csv(csv_file, sep="\t", header=0)
+    else:
+        raise ValueError(
+            f"File {csv_file} is not a CSV or TSV file. Please provide a valid file."
+        )
+    
+    # Check if the target column exists
+    if target_column not in df.columns:
+        raise ValueError(
+            f"Column {target_column} not found in the CSV file. Please provide a valid column name."
+        )
+    
+    # Sort the dataframe by the target column
+    if sort_by is not None:
+        for col in sort_by:
+            if col not in df.columns:
+                raise ValueError(
+                    f"Column {sort_by} not found in the CSV file. Please provide a valid column name."
+                )
+        df = df.sort_values(by=sort_by)
+    
+    # deduplicate the dataframe
+    df = df.drop_duplicates(subset=[target_column])
+
+    # Save the target column to a new CSV file
+    output_file = Path(output_dir) / f"{Path(csv_file).stem}_{target_column}.csv"
+    # make the output directory if it doesn't exist
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    # save the target column to a new CSV file
+    df[[target_column]].to_csv(output_file, index=False, header=False)
+    logging.info(f"Saved the target column {target_column} to {output_file}")
+
+    return str(output_file)
 
 
 def infer_output_filename_from_args(args: ArgumentParser) -> Path:
@@ -287,6 +368,30 @@ if __name__ == "__main__":
             logging.warning(
                 f"Phrase scoring argument is given, but tokenizer is set to {args.tokenizer}. Did you mean to use `--tokenizer spacy`...?"
             )
+    
+    if args.corpus.endswith(".csv") or args.corpus.endswith(".tsv"):
+        # Prepare the corpus from the CSV file
+        output_file = prepare_corpus_from_csv(
+            args.corpus,
+            args.output_dir,
+            target_column=args.target_column,
+            sort_by=args.sort_by,
+        )
+        args.corpus = output_file
+    
+    if args.chunk_by == "line" and args.chunk_size > 1:
+        # If chunking by line, set the chunk size to 1
+        logging.warning(
+            f"Chunking by line, but chunk size is set to {args.chunk_size}. Setting chunk size to 1."
+        )
+        args.chunk_size = 1
+    elif args.chunk_by == "word" and args.chunk_size == 1:
+        # If chunking by word, set the chunk size to 1000
+        logging.warning(
+            f"Chunking by word, but chunk size is set to {args.chunk_size}. Setting chunk size to 1000."
+        )
+        args.chunk_size = 1000
+
 
     # returns a Skimmer object
     g = build_graph(
@@ -303,7 +408,9 @@ if __name__ == "__main__":
             "labels": args.labels,
             "allowed_upos": args.allowed_upos,
             "chunk_size": args.chunk_size,
+            "chunk_by": args.chunk_by,
             "file_pattern": args.file_pattern,
+            "skip_phraser": args.skip_phraser,
             "phrase_min_count": args.phrase_min_count,
             "phrase_threshold": args.phrase_threshold,
             "phrase_scoring": args.phrase_scoring,

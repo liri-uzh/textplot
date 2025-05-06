@@ -2,14 +2,14 @@
 # -*- coding: utf-8 -*-
 
 import re
-import os
 import string
 import pkgutil
 import logging
+import gc
 
 from tqdm import tqdm
 from pathlib import Path
-from typing import List, Set, Generator, Dict, Optional
+from typing import List, Set, Generator, Dict, Optional, Callable, Iterable
 
 from gensim.models.phrases import Phrases
 
@@ -24,6 +24,11 @@ from textplot.utils import parse_wordlists
 # Set up logging
 logger = logging.getLogger(__name__)
 
+# try:
+# 	from memory_profiler import profile # Import the profile decorator
+# except ImportError:
+# 	def profile(func): # Create a dummy decorator if memory_profiler is not available
+# 		return func
 
 class PhrasalTokenizer:
     """
@@ -36,6 +41,7 @@ class PhrasalTokenizer:
     def __init__(
         self,
         lang: str = "en",
+        skip_phraser: bool = False,
         min_count: int = 3,
         threshold: float = 0.6,
         scoring: str = "npmi",
@@ -69,11 +75,12 @@ class PhrasalTokenizer:
         self.disable = disable or ["ner", "textcat"]  # Default components to disable
 
         # phrase detection arguments
-        self.phraser_model = None
+        self.skip_phraser = skip_phraser
         self.min_count = min_count
         self.threshold = threshold
         self.scoring = scoring
         self.phrase_lemma = phrase_lemma
+        self.phraser_model = None
 
         self.nlp = self._load_spacy_model()
         self._add_tokenizer_exceptions()
@@ -155,51 +162,6 @@ class PhrasalTokenizer:
         self.connector_words.update(custom_connector_words)
         logger.debug(f"Connector words: {self.connector_words}")
 
-    def learn_phrases(self, docs: List[Doc]) -> Phrases:
-        """
-        Learn phrases from a list of spaCy Doc objects.
-
-        Args:
-            docs: List of spaCy Doc objects
-
-        Returns:
-            A Phrases object containing the learned phrases
-        """
-
-        logger.debug(
-            f"Hyperparameters for Phrase Detection: min_count: {self.min_count}, threshold: {self.threshold}, scoring: {self.scoring}"
-        )
-
-        bigram_model = Phrases(
-            min_count=self.min_count,
-            threshold=self.threshold,
-            scoring=self.scoring,
-            connector_words=self.connector_words,
-        )
-
-        trigram_model = Phrases(
-            min_count=self.min_count,
-            threshold=self.threshold,
-            scoring=self.scoring,
-            connector_words=self.connector_words,
-        )
-
-        for doc in tqdm(
-            docs, total=len(docs), desc="Learning phrases...", bar_format=BAR_FORMAT
-        ):
-            # doc_sent_tokens = [[token.text for token in sent if is_valid_token(token)] for sent in doc.sents]
-            doc_sent_tokens = [[token.text for token in sent] for sent in doc.sents]
-            # Apply the bigram model to the sentences
-            bigram_model.add_vocab(doc_sent_tokens)
-
-            # Apply the trigram model to the sentences
-            trigram_model.add_vocab(bigram_model[doc_sent_tokens])
-
-        # Freeze the models for faster processing
-        bigram_model.freeze()
-        trigram_model.freeze()
-
-        return trigram_model
 
     def add_phrase_iob_annotations(
         self, doc: Doc, sentences_ngrams: List[List[str]], verbose: bool = False
@@ -255,28 +217,47 @@ class PhrasalTokenizer:
         # Return the Doc with annotations added
         return doc
 
-    @staticmethod
-    def split_text_into_chunks(text: str, chunk_size: int = 500) -> List[str]:
+    # @profile
+    def learn_phrases(self, chunk_iter, verbose: bool = False, **kwargs):
         """
-        Split a text into chunks of approximately equal size.
+        Learn phrases from a streaming input of text chunks using the learned phraser model.
 
         Args:
-            text: Text to split into chunks
-            chunk_size: Maximum number of whitespace-separated tokens per chunk
+            chunk_iter: Iterable yielding text chunks (strings)
+            verbose: Debug output
 
         Returns:
-            List of text chunks
+            A Phrases object containing the learned phrases
         """
-        # Split text on whitespace
-        whitespace_split_text = re.split(r"\s+", text)
+        
+        bigram_model = Phrases(
+            min_count=self.min_count,
+            threshold=self.threshold,
+            scoring=self.scoring,
+            connector_words=self.connector_words,
+        )
+        trigram_model = Phrases(
+            min_count=self.min_count,
+            threshold=self.threshold,
+            scoring=self.scoring,
+            connector_words=self.connector_words,
+        )
 
-        # Group tokens into chunks of specified size
-        chunks = [
-            " ".join(whitespace_split_text[i : i + chunk_size])
-            for i in range(0, len(whitespace_split_text), chunk_size)
-        ]
+        # Stream over chunks, extract sentences, and update the phrase models
+        for chunk in tqdm(chunk_iter, desc="Learning phrases...", bar_format=BAR_FORMAT):
+            for doc in self.nlp.pipe([chunk], n_process=1):
+                doc_sent_tokens = [[token.text for token in sent] for sent in doc.sents]
+                bigram_model.add_vocab(doc_sent_tokens)
+                trigram_model.add_vocab(bigram_model[doc_sent_tokens])
 
-        return chunks
+        bigram_model.freeze()
+        trigram_model.freeze()
+        
+        self.phraser_model = trigram_model
+
+        # Explicitly free memory
+        del bigram_model
+        gc.collect()
 
     def apply_phraser(self, doc: Doc, verbose: bool = False) -> Doc:
         """
@@ -289,8 +270,10 @@ class PhrasalTokenizer:
         Returns:
             Doc with phrase_iob annotations
         """
-        if self.phraser_model is None:
-            raise ValueError("No phraser model available. Run fit() first.")
+        if self.skip_phraser or self.phraser_model is None:
+            # do nothing
+            # logging.warning("No phraser model available. Skipping phrase extraction.")
+            return doc
 
         doc_sent_tokens = [
             [token.text for token in sent if not token.is_space] for sent in doc.sents
@@ -361,10 +344,7 @@ class PhrasalTokenizer:
             if token.is_digit:
                 return False
 
-            if (
-                isinstance(self.allowed_upos, set)
-                and token.pos_ not in self.allowed_upos
-            ):
+            if len(self.allowed_upos) > 0 and token.pos_ not in self.allowed_upos:
                 return False
 
             # otherwise, it's a valid token
@@ -376,16 +356,13 @@ class PhrasalTokenizer:
 
             # If token is outside any phrase
             if token._.phrase_iob == "O":
-                if not is_valid_token(token):
-                    i += 1
-                    continue
-                else:
+                if is_valid_token(token):
                     yield {
                         "unstemmed": token.text,
                         "stemmed": token.lemma_,
                         "pos": token.pos_,
                     }
-                    i += 1
+                i += 1
 
             # If token is the beginning of a phrase
             elif token._.phrase_iob == "B" and token.text not in self.labels:
@@ -434,41 +411,30 @@ class PhrasalTokenizer:
                 }
                 i += 1
 
-    def tokenize(
-        self, text: str, chunk_size: int = 500, verbose: bool = False, **kwargs
-    ) -> Generator[Dict[str, str], None, None]:
+    # @profile
+    def tokenize(self, chunk_iter_factory: Callable[[], Iterable[str]], verbose: bool = False, **kwargs):
         """
-        Tokenize text using spaCy and apply the learned phraser model.
+        Tokenize text using spaCy and apply the learned phraser model in a streaming way.
 
         Args:
-            text: Input text to tokenize
-            chunk_size: Size of chunks to split the text into for processing
-            verbose: Whether to print token annotations for debugging
+            chunk_iter_factory: Callable returning an iterable of text chunks (strings)
+            verbose: Debug output
 
         Yields:
             Dict containing the text and lemma for each token or phrase
         """
+        if self.skip_phraser:
+            logger.warning("--skip_phraser is set, skipping phrase extraction.")
+        else:
+            self.learn_phrases(chunk_iter_factory(), verbose=verbose, **kwargs)
 
-        # Split text into chunks for processing
-        chunks = self.split_text_into_chunks(text, chunk_size)
-
-        # Process chunks with spaCy
-        docs = list(self.nlp.pipe(chunks, n_process=os.cpu_count() - 1))
-
-        # Learn phrases from the documents
-        self.phraser_model = self.learn_phrases(docs)
-
-        # Apply the phraser model to each document
-        for doc in tqdm(
-            docs, desc="Extracting tokens...", total=len(docs), bar_format=BAR_FORMAT
-        ):
-            # Apply the phraser model to the document
+        i = 0
+        for doc in self.nlp.pipe(chunk_iter_factory(), n_process=1):
             doc = self.apply_phraser(doc, verbose=verbose)
-
-            # Extract tokens and phrases
-            for i, token in enumerate(self.extract_phrase_spans(doc)):
+            for token in self.extract_phrase_spans(doc):
                 token["offset"] = i
                 yield token
+                i += 1
 
 
 class LegacyTokenizer:
@@ -512,42 +478,42 @@ class LegacyTokenizer:
                 .splitlines()
             )
 
-    def tokenize(self, text: str, **kwargs) -> Generator[Dict[str, str], None, None]:
+
+    def tokenize(self, chunk_iter_factory: Callable[[], Iterable[str]], verbose: bool = False, **kwargs) -> Generator[Dict[str, str], None, None]:
         """
-        Tokenize text using regex and apply Porter stemming.
+        Tokenize text using spaCy and apply the learned phraser model in a streaming way.
 
         Args:
-            text: Input text to tokenize
-            **kwargs: Additional arguments (for API compatibility)
+            chunk_iter_factory: Callable returning an iterable of text chunks (strings)
+            verbose: Debug output
 
         Yields:
-            Dict containing token information with keys:
-            - stemmed: The stemmed token (legacy format)
-            - unstemmed: The unstemmed token (legacy format)
-            - offset: Token position in the sequence
+            Dict containing the text and lemma for each token or phrase
         """
-        # Extract word tokens using regex (skip numbers, punctuation, etc.)
-        tokens = re.finditer(r"[^\W\d_]+", text.lower())
 
         offset = 0
+        
+        for chunk in tqdm(chunk_iter_factory(), desc="Extracting tokens...", bar_format=BAR_FORMAT):
+            # Extract word tokens using regex (skip numbers, punctuation, etc.)
+            tokens = re.finditer(r"[\w']+", chunk.lower())
 
-        for match in tqdm(tokens, desc="Extracting tokens...", bar_format=BAR_FORMAT):
-            # Get the raw token
-            unstemmed = match.group(0)
-            stemmed = self.stemmer.stem(unstemmed)
+            for match in tokens:
+                # Get the raw token
+                unstemmed = match.group(0)
+                stemmed = self.stemmer.stem(unstemmed)
 
-            # Skip stopwords
-            if unstemmed in self.stopwords:
-                continue
+                # Skip stopwords
+                if unstemmed in self.stopwords:
+                    continue
 
-            yield {
-                "stemmed": stemmed,  # Legacy field
-                "unstemmed": unstemmed,  # Legacy field
-                "offset": offset,
-            }
+                yield {
+                    "stemmed": stemmed,  # Legacy field
+                    "unstemmed": unstemmed,  # Legacy field
+                    "offset": offset,
+                }
 
-            offset += 1
-
+                offset += 1
+            
 
 # Example usage
 if __name__ == "__main__":
