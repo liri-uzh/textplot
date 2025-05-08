@@ -23,16 +23,14 @@ cd textplot
 # Create a virtual environment (we recommend conda)
 conda create -n textplot python=3.11
 conda activate textplot
-# Install the dependencies
-pip install -r requirements.txt
 # Install textplot for command line usage
 pip install .
+```
 
-# Install the language models for SpaCy
-python -m spacy download en_core_web_sm
+By default, we install [SpaCy's small English model](https://github.com/explosion/spacy-models/releases/tag/en_core_web_sm-3.8.0). If you want to use a different language, you need to install the appropriate model. For example, for German, run:
+
+```bash
 python -m spacy download de_core_news_sm
-python -m spacy download fr_core_news_sm
-python -m spacy download it_core_news_sm
 ```
 
 ## Usage
