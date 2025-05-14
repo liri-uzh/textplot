@@ -11,7 +11,7 @@ def load_words_from_file(file_path: str) -> list:
     Load words (e.g. stopwords, connectors, etc.) from a file into a list.
     """
     with open(file_path, "r") as f:
-        return [line.strip() for line in f]
+        return [line.strip() for line in f if not line.startswith("#")]
 
 
 def parse_wordlists(

@@ -428,8 +428,8 @@ if __name__ == "__main__":
 
     # Write the graph to a GML file
     g.write_gml(f"{output_file_path}.gml")  # GML format
-    logging.info(f"Graph written to {output_file_path}.gml")
-
+    print(f"Graph written to {output_file_path}.gml.")
+    
     # Write the graph to a GraphML file
     # g.write_graphml(f"{output_file_path}.graphml") # XML format
-    # logging.info(f"Graph written to {output_file_path}.graphml")
+    # print(f"Graph written to {output_file_path}.graphml.")

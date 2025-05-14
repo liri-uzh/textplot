@@ -103,6 +103,14 @@ python -m textplot.helpers \
     --output_dir data/outputs/8set
 ```
 
+## Visualization
+
+For effective visualisations, we recommend using [Gephi](https://gephi.org/).
+
+Below are some useful resources for getting familiar with Gephi:
+    - https://www.youtube.com/watch?v=371n3Ye9vVo&list=PLk_jmmkw5S2BqnYBqF2VNPcszY93-ze49
+    - https://www.youtube.com/watch?v=WpFZmIJTjA8&t=731s
+
 
 ## TODOs
 

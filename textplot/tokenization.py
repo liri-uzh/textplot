@@ -344,6 +344,10 @@ class PhrasalTokenizer:
             if token.is_digit:
                 return False
 
+            # if the token is less than 3 characters, return False
+            if len(token.text) < 3:
+                return False
+
             if len(self.allowed_upos) > 0 and token.pos_ not in self.allowed_upos:
                 return False
 
